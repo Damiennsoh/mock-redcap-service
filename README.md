@@ -2,7 +2,15 @@
 
 Standalone mock REDCap API service for NEPS Digital development.
 
-## Deploy to Render
+## Deployed Service
+
+The mock API is currently deployed on Render!
+- **URL**: https://mock-redcap-service.onrender.com
+- **API Base Path**: https://mock-redcap-service.onrender.com/api
+- **Docs**: https://mock-redcap-service.onrender.com/docs
+- **Health Check**: https://mock-redcap-service.onrender.com/health
+
+## Deploy to Render (If you need to re-deploy)
 
 1. Push this repo to GitHub
 2. Connect repo to Render (New Web Service → Build and deploy from Git repository)
@@ -16,6 +24,8 @@ Standalone mock REDCap API service for NEPS Digital development.
 | `/health` | GET | Health check |
 | `/api/participants` | GET | List participants |
 | `/api/participants/{id}` | GET | Get participant |
+| `/api/participants/{id}/monthly-reports` | GET | Get participant's monthly reports |
+| `/api/participants/{id}/comprehensive-waves` | GET | Get participant's comprehensive waves |
 | `/api/monthly-reports` | GET | List monthly reports |
 | `/api/comprehensive-waves` | GET | List comprehensive waves |
 | `/api/distress-screenings` | GET | Get safeguarding alerts |
@@ -31,7 +41,7 @@ Standalone mock REDCap API service for NEPS Digital development.
 Set this in your `.env`:
 
 ```bash
-REDCAP_API_URL=https://your-render-url.onrender.com/api
+REDCAP_API_URL=https://mock-redcap-service.onrender.com/api
 REDCAP_API_TOKEN=mock_token_neps_2025
 ```
 
