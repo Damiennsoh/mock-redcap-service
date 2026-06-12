@@ -138,6 +138,19 @@ class ConsentRecord(BaseModel):
     re_consent_required: bool
     re_consent_date: Optional[str]
 
+class NLPResponse(BaseModel):
+    participant_id: str
+    response_id: str
+    response_type: str
+    collection_date: str
+    question_prompt: str
+    response_text: str
+    word_count: int
+    language: str
+    translated: bool
+    sentiment_manual: str
+    thematic_codes: List[str]
+
 # ─── FIELD MAPPING (Update when real REDCap CRFs finalize) ───────
 
 REDCAP_TO_INTERNAL = {
@@ -176,6 +189,7 @@ class MockDataStore:
         self.distress_screenings = self._generate_distress_screenings()
         self.wp6_sessions = self._generate_wp6_sessions()
         self.consent_records = self._generate_consent_records()
+        self.nlp_responses = self._generate_nlp_data()
         self.referrals = []
 
     def _generate_participants(self, count: int = 150) -> List[Dict]:
@@ -384,6 +398,60 @@ class MockDataStore:
             })
         return records
 
+    def _generate_nlp_data(self) -> List[Dict]:
+        """Generate qualitative text data for NLP processing."""
+        sample_narratives = [
+            "School is very stressful. Exams make me anxious and I can't sleep.",
+            "I feel alone sometimes. My friends don't understand what I'm going through.",
+            "Teachers are supportive but the workload is too much.",
+            "I worry about my family's money. It affects my concentration.",
+            "Sometimes I think about giving up. Life feels too hard.",
+            "My church community helps me cope with stress.",
+            "Bullying at school makes me not want to attend.",
+            "I don't know where to get help for my feelings.",
+            "My parents expect high grades. The pressure is overwhelming.",
+            "I feel better when I talk to someone who listens.",
+            "The counseling sessions have really helped me manage my anxiety.",
+            "I'm scared to tell my parents how I feel because they might be disappointed.",
+            "Moving to a new school was hard. I didn't make friends for months.",
+            "My grandmother's passing really affected my mental health.",
+            "Playing football helps me release stress and forget my worries.",
+        ]
+        
+        nlp_data = []
+        for p in self.participants:
+            if random.random() > 0.7:  # 30% have text responses
+                narrative = random.choice(sample_narratives)
+                nlp_data.append({
+                    "participant_id": p["participant_id"],
+                    "response_id": f"NLP-{uuid.uuid4().hex[:8].upper()}",
+                    "response_type": random.choice(["youth_narrative", "interview_transcript", "open_ended"]),
+                    "collection_date": (datetime.now() - timedelta(days=random.randint(1, 180))).strftime("%Y-%m-%d"),
+                    "question_prompt": random.choice([
+                        "Tell us about your biggest challenge",
+                        "How do you cope with stress?",
+                        "What support do you need?",
+                        "Describe your school experience",
+                        "Share a story about a difficult time"
+                    ]),
+                    "response_text": narrative,
+                    "word_count": len(narrative.split()),
+                    "language": "en",
+                    "translated": False,
+                    "sentiment_manual": random.choice(["negative", "neutral", "positive"]),
+                    "thematic_codes": random.choice([
+                        ["academic_stress", "anxiety"],
+                        ["social_isolation", "depression"],
+                        ["family_pressure", "economic_strain"],
+                        ["coping_religious", "community_support"],
+                        ["bullying", "school_belonging"],
+                        ["grief", "loss"],
+                        ["help_seeking", "stigma"],
+                        ["peer_support", "coping_sports"]
+                    ]),
+                })
+        return nlp_data
+
     # ─── PUBLIC METHODS ─────────────────────────────────────────────
 
     def get_participants(self, country: Optional[str] = None, 
@@ -435,6 +503,14 @@ class MockDataStore:
         self.referrals.append(referral)
         return referral
 
+    def get_nlp_responses(self, response_type: Optional[str] = None, sentiment: Optional[str] = None) -> List[Dict]:
+        results = self.nlp_responses.copy()
+        if response_type:
+            results = [r for r in results if r["response_type"] == response_type]
+        if sentiment:
+            results = [r for r in results if r["sentiment_manual"] == sentiment]
+        return results
+
     def get_stats(self) -> Dict:
         return {
             "total_participants": len(self.participants),
@@ -449,8 +525,9 @@ class MockDataStore:
             "high_risk_flags": len(self.distress_screenings),
             "open_referrals": len([r for r in self.referrals if r["status"] == "initiated"]),
             "wp6_enrolled": len(self.wp6_sessions),
+            "nlp_responses_count": len(self.nlp_responses),
             "source": "mock",
-            "version": "0.1.0"
+            "version": "0.1.1"
         }
 
 # Initialize store
@@ -462,7 +539,7 @@ store = MockDataStore()
 def root():
     return {
         "service": "NEPS Mock REDCap API",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "docs": "/docs",
         "endpoints": {
             "participants": "/api/participants",
@@ -472,8 +549,36 @@ def root():
             "wp6_sessions": "/api/wp6-sessions",
             "consent": "/api/consent",
             "referrals": "/api/referrals",
+            "nlp_responses": "/api/nlp/responses",
             "stats": "/api/stats",
         }
+    }
+
+@app.get("/api/nlp/responses")
+def list_nlp_responses(
+    response_type: Optional[str] = None,
+    sentiment: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500)
+):
+    """Get qualitative text responses for NLP processing."""
+    data = store.get_nlp_responses(response_type=response_type, sentiment=sentiment)
+    return {
+        "data": data[:limit],
+        "count": len(data),
+        "source": "mock"
+    }
+
+@app.get("/api/participants/{participant_id}/nlp-responses")
+def get_participant_nlp_responses(participant_id: str):
+    """Get NLP responses for a specific participant."""
+    participant = store.get_participant(participant_id)
+    if not participant:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    responses = [r for r in store.nlp_responses if r["participant_id"] == participant_id]
+    return {
+        "participant_id": participant_id,
+        "responses": responses,
+        "count": len(responses)
     }
 
 @app.get("/health")
