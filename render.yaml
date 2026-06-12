@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: neps-mock-api
+    runtime: docker
+    plan: free
+    envVars:
+      - key: MOCK_API_TOKEN
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /health

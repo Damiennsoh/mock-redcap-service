@@ -1,0 +1,326 @@
+ I'll help you set up a hosted mock REDCap API that all teams can access, with a clean path to swap to real REDCap later.
+
+---
+
+## Architecture
+
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│   Your Teams    │────▶│  Hosted Mock API    │────▶│  Real REDCap    │
+│  (Local Dev)    │     │  (Cloud/Server)     │     │  (When Ready)   │
+└─────────────────┘     └─────────────────────┘     └─────────────────┘
+        │                        │
+        │                        │
+        ▼                        ▼
+   Uses base URL:          Same base URL:
+   https://mock.neps.org   https://kcird.org/api/
+   (You control)            (Bernard gives you)
+```
+
+---
+
+## Step 1: Choose Hosting
+
+| Option | Cost | Setup Time | Best For |
+|:---|:---|:---|:---|
+| **Railway** | Free tier / $5/mo | 10 min | Easiest deployment |
+| **Render** | Free tier | 15 min | Good free option |
+| **DigitalOcean Droplet** | $6/mo | 30 min | Full control |
+| **AWS EC2 t3.micro** | ~$8/mo | 45 min | Enterprise familiarity |
+
+**Recommendation: Railway** — simplest, free tier available, auto-deploys from GitHub.
+
+---
+
+## Step 2: Create Standalone Mock API Service
+
+Create a new repo `neps-mock-api` that serves the mock independently:
+
+```python
+# neps-mock-api/main.py
+from fastapi import FastAPI, Query
+from typing import Optional, List
+import random
+from datetime import datetime, timedelta
+from enum import Enum
+import uuid
+
+app = FastAPI(title="NEPS Mock REDCap API", version="0.1.0")
+
+# ─── INTERNAL DATA MODELS (Stable — teams code against these) ───
+
+class Participant(BaseModel):
+    participant_id: str
+    country: str
+    site: str
+    school: str
+    age: int
+    gender: str
+    enrollment_date: str
+    cohort_status: str
+    consent_status: str
+
+class MonthlyReport(BaseModel):
+    participant_id: str
+    month: int
+    anxiety: float
+    depression: float
+    stress: float
+    sleep_quality: str
+    risk_flag: str
+
+# ─── FIELD MAPPING (Update when CRFs finalize) ───
+
+REDCAP_TO_INTERNAL = {
+    "record_id": "participant_id",
+    "anxiety_score": "anxiety",
+    "depression_score": "depression", 
+    "perceived_stress_score": "stress",
+    # ... etc
+}
+
+# ─── MOCK DATA GENERATOR (Same logic, packaged as service) ───
+
+class MockDataStore:
+    def __init__(self):
+        self.participants = self._generate_participants()
+        self.reports = self._generate_reports()
+    
+    def _generate_participants(self, count=150):
+        # Same logic as before
+        pass
+    
+    def get_participants(self, country=None, site=None):
+        results = self.participants
+        if country:
+            results = [p for p in results if p["country"] == country]
+        return results
+
+store = MockDataStore()
+
+# ─── API ENDPOINTS (Mirror real REDCap structure) ───
+
+@app.get("/api/participants")
+def list_participants(
+    country: Optional[str] = None,
+    site: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500)
+):
+    """Get participant registry"""
+    data = store.get_participants(country=country, site=site)
+    return {
+        "data": data[:limit],
+        "total": len(data),
+        "source": "mock"
+    }
+
+@app.get("/api/participants/{participant_id}")
+def get_participant(participant_id: str):
+    """Get single participant"""
+    participant = next(
+        (p for p in store.participants if p["participant_id"] == participant_id),
+        None
+    )
+    if not participant:
+        raise HTTPException(404, "Participant not found")
+    return participant
+
+@app.get("/api/records")
+def export_records(
+    fields: Optional[List[str]] = Query(None),
+    events: Optional[List[str]] = Query(None)
+):
+    """Export records (REDCap-compatible format)"""
+    records = store.reports
+    if fields:
+        records = [{k: v for k, v in r.items() if k in fields} for r in records]
+    return records
+
+@app.get("/api/stats")
+def get_stats():
+    """Project statistics"""
+    return {
+        "total_participants": len(store.participants),
+        "by_country": {
+            "Ghana": len([p for p in store.participants if p["country"] == "Ghana"]),
+            "Sierra Leone": len([p for p in store.participants if p["country"] == "Sierra Leone"]),
+            "Tanzania": len([p for p in store.participants if p["country"] == "Tanzania"]),
+        },
+        "source": "mock"
+    }
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "neps-mock-api"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+---
+
+## Step 3: Dockerfile for Deployment
+
+```dockerfile
+# neps-mock-api/Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```txt
+# neps-mock-api/requirements.txt
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+pydantic==2.7.0
+```
+
+---
+
+## Step 4: Deploy to Railway
+
+### 4.1 Create Repo and Push
+
+```bash
+# Create new repo
+mkdir neps-mock-api
+cd neps-mock-api
+git init
+git remote add origin https://github.com/nepsdigitalsystem/neps-mock-api.git
+
+# Add files (main.py, Dockerfile, requirements.txt)
+git add .
+git commit -m "feat: standalone mock REDCap API"
+git push -u origin main
+```
+
+### 4.2 Railway Setup
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Create project
+railway init --name neps-mock-api
+
+# Deploy
+railway up
+
+# Get public URL
+railway domain
+# Output: https://neps-mock-api-production.up.railway.app
+```
+
+---
+
+## Step 5: Team Configuration
+
+### Shared `.env` for All Teams
+
+```bash
+# .env (all repos)
+# Current (mock):
+REDCAP_API_URL=https://neps-mock-api-production.up.railway.app/api
+REDCAP_API_TOKEN=mock_token_neps_2025
+
+# Future (real — just change these two lines):
+# REDCAP_API_URL=https://kcird.org/api/
+# REDCAP_API_TOKEN=bernard_will_give_you_this
+```
+
+### Client Code (Same for All Teams)
+
+```python
+# app/clients/redcap_client.py
+import os
+import requests
+from typing import Optional, List
+
+REDCAP_URL = os.getenv("REDCAP_API_URL", "https://neps-mock-api-production.up.railway.app/api")
+REDCAP_TOKEN = os.getenv("REDCAP_API_TOKEN", "mock_token_neps_2025")
+
+class RedCapClient:
+    def __init__(self):
+        self.base_url = REDCAP_URL.rstrip('/')
+        self.headers = {"Authorization": f"Bearer {REDCAP_TOKEN}"}
+    
+    def get_participants(self, country: Optional[str] = None) -> list:
+        params = {"country": country} if country else {}
+        response = requests.get(f"{self.base_url}/participants", params=params)
+        return response.json()["data"]
+    
+    def export_records(self) -> list:
+        response = requests.get(f"{self.base_url}/records")
+        return response.json()
+
+# Usage — same code works for mock AND real REDCap
+client = RedCapClient()
+participants = client.get_participants(country="Ghana")
+```
+
+---
+
+## Step 6: Swap to Real REDCap (When Ready)
+
+| Change | What You Do |
+|:---|:---|
+| Update URL | Change `REDCAP_API_URL` in one place (Railway env var or team `.env`) |
+| Update token | Change `REDCAP_API_TOKEN` |
+| Update field mapping | Modify `REDCAP_TO_INTERNAL` dict in one file |
+| Team code | **Zero changes** — they use same client |
+
+---
+
+## What You Commit to `neps-mock-api` Repo
+
+```
+neps-mock-api/
+├── main.py              # FastAPI app
+├── Dockerfile           # Container build
+├── requirements.txt     # Dependencies
+├── railway.toml         # Railway config (auto-generated)
+└── README.md            # Team access instructions
+```
+
+---
+
+## Quick Commands Summary
+
+```bash
+# 1. Create and push repo
+git clone https://github.com/nepsdigitalsystem/neps-mock-api.git
+cd neps-mock-api
+# (add files from above)
+git add . && git commit -m "init" && git push
+
+# 2. Deploy
+railway login
+railway init
+railway up
+railway domain  # Copy this URL
+
+# 3. Test
+curl https://your-railway-url/api/stats
+
+# 4. Share URL with teams
+```
+
+---
+
+## What You Tell Teams
+
+> "New mock API is live at `https://neps-mock-api-production.up.railway.app/api`. Update your `.env` `REDCAP_API_URL` to this. Same endpoints, same data, now shared and consistent. When real REDCap arrives, I'll update the URL — your code won't change."
+
+Want me to generate the **complete `neps-mock-api` repo files** as a zip you can push directly?
