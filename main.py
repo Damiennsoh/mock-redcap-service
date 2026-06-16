@@ -143,13 +143,25 @@ class NLPResponse(BaseModel):
     response_id: str
     response_type: str
     collection_date: str
+    country: str
+    site: str
     question_prompt: str
     response_text: str
     word_count: int
     language: str
     translated: bool
-    sentiment_manual: str
+    severity_level: str
+    anxiety_level: str
+    depression_level: str
+    stress_level: str
+    emotional_label: str
+    clinical_status: str
+    suicidality_flag: str
+    requires_referral: str
+    alert_priority: str
     thematic_codes: List[str]
+    sentiment_manual: str
+    sentiment_score: float
 
 # ─── FIELD MAPPING (Update when real REDCap CRFs finalize) ───────
 
@@ -398,58 +410,139 @@ class MockDataStore:
             })
         return records
 
-    def _generate_nlp_data(self) -> List[Dict]:
-        """Generate qualitative text data for NLP processing."""
-        sample_narratives = [
-            "School is very stressful. Exams make me anxious and I can't sleep.",
-            "I feel alone sometimes. My friends don't understand what I'm going through.",
-            "Teachers are supportive but the workload is too much.",
-            "I worry about my family's money. It affects my concentration.",
-            "Sometimes I think about giving up. Life feels too hard.",
-            "My church community helps me cope with stress.",
-            "Bullying at school makes me not want to attend.",
-            "I don't know where to get help for my feelings.",
-            "My parents expect high grades. The pressure is overwhelming.",
-            "I feel better when I talk to someone who listens.",
-            "The counseling sessions have really helped me manage my anxiety.",
-            "I'm scared to tell my parents how I feel because they might be disappointed.",
-            "Moving to a new school was hard. I didn't make friends for months.",
-            "My grandmother's passing really affected my mental health.",
-            "Playing football helps me release stress and forget my worries.",
+    def _generate_nlp_data(self, count: int = 500) -> List[Dict]:
+        """Generate 500 qualitative text responses for ML training."""
+        narratives = {
+            "low": [
+                "School is fine, I manage my work okay.",
+                "Sometimes I feel tired but it's normal.",
+                "My friends are supportive, I feel okay.",
+                "I sleep well most nights, no big worries.",
+                "Exams are stressful but I can handle it.",
+                "I enjoy spending time with my family on weekends.",
+                "My teachers are helpful when I ask questions.",
+                "I feel hopeful about finishing school this year.",
+                "Playing football with friends helps me relax.",
+                "I had a good day today, nothing special happened.",
+            ],
+            "moderate": [
+                "School is very stressful. Exams make me anxious and I can't sleep well.",
+                "I feel alone sometimes. My friends don't fully understand me.",
+                "Teachers are supportive but the workload feels too much.",
+                "I worry about my family's money. It affects my concentration sometimes.",
+                "I feel overwhelmed by everything expected of me.",
+                "Sometimes I cry at night but I hide it from everyone.",
+                "My parents argue a lot and it makes me feel uneasy.",
+                "I struggle to focus in class because of personal issues.",
+                "I feel like I'm falling behind and can't catch up.",
+                "Social media makes me compare myself to others constantly.",
+            ],
+            "high": [
+                "Sometimes I think about giving up. Life feels too hard to continue.",
+                "I can't sleep anymore. My mind races with dark thoughts every night.",
+                "Nobody would notice if I disappeared. I feel completely invisible.",
+                "The pressure is crushing me. I see no way out of this darkness.",
+                "I've started hurting myself to feel something other than this emptiness.",
+                "I don't see the point in anything anymore. Everything feels meaningless.",
+                "I wish I could talk to someone but I'm afraid they'll judge me.",
+                "Every day feels the same — hopeless and exhausting.",
+                "I feel like a burden to my family and friends.",
+                "The pain inside is too much. I don't know how much longer I can hold on.",
+            ]
+        }
+
+        emotional_labels = [
+            "admiration", "joy", "confusion", "curiosity", "disappointment",
+            "embarrassment", "gratitude", "sadness", "fear", "anger", "hope"
         ]
-        
+
+        clinical_statuses = [
+            "normal", "stressed", "anxious", "depressed",
+            "suicidal_ideation", "severe_distress"
+        ]
+
+        question_prompts = [
+            "Tell us about your biggest challenge right now",
+            "How do you cope with stress in your daily life?",
+            "What support do you need that you are not receiving?",
+            "Describe your school experience this term",
+            "How do you feel about your future after school?",
+            "What makes you feel happy or hopeful?",
+            "Describe a time when you felt really low",
+            "What would you change about your current situation?",
+            "How do you feel about your relationships with family?",
+            "What are your thoughts about your mental health?",
+        ]
+
+        response_types = ["youth_narrative", "interview_transcript", "open_ended", "journal_entry"]
+        countries = ["GHA", "SLE", "TZA"]
+        sites = {
+            "GHA": ["KNUST", "Accra_Poly", "Tamale_Tech"],
+            "SLE": ["Fourah_Bay", "Eastern_Tech", "Bo_Campus"],
+            "TZA": ["UDSM", "Ardhi", "MUST"],
+        }
+
         nlp_data = []
-        for p in self.participants:
-            if random.random() > 0.7:  # 30% have text responses
-                narrative = random.choice(sample_narratives)
-                nlp_data.append({
-                    "participant_id": p["participant_id"],
-                    "response_id": f"NLP-{uuid.uuid4().hex[:8].upper()}",
-                    "response_type": random.choice(["youth_narrative", "interview_transcript", "open_ended"]),
-                    "collection_date": (datetime.now() - timedelta(days=random.randint(1, 180))).strftime("%Y-%m-%d"),
-                    "question_prompt": random.choice([
-                        "Tell us about your biggest challenge",
-                        "How do you cope with stress?",
-                        "What support do you need?",
-                        "Describe your school experience",
-                        "Share a story about a difficult time"
-                    ]),
-                    "response_text": narrative,
-                    "word_count": len(narrative.split()),
-                    "language": "en",
-                    "translated": False,
-                    "sentiment_manual": random.choice(["negative", "neutral", "positive"]),
-                    "thematic_codes": random.choice([
-                        ["academic_stress", "anxiety"],
-                        ["social_isolation", "depression"],
-                        ["family_pressure", "economic_strain"],
-                        ["coping_religious", "community_support"],
-                        ["bullying", "school_belonging"],
-                        ["grief", "loss"],
-                        ["help_seeking", "stigma"],
-                        ["peer_support", "coping_sports"]
-                    ]),
-                })
+        for _ in range(count):
+            severity = random.choices(
+                ["low", "moderate", "high"], 
+                weights=[50, 35, 15]
+            )[0]
+
+            narrative = random.choice(narratives[severity])
+            country = random.choice(countries)
+            site = random.choice(sites[country])
+
+            if severity == "low":
+                clinical_status = random.choices(
+                    clinical_statuses, weights=[85, 10, 3, 1, 0, 1]
+                )[0]
+            elif severity == "moderate":
+                clinical_status = random.choices(
+                    clinical_statuses, weights=[20, 40, 25, 12, 2, 1]
+                )[0]
+            else:
+                clinical_status = random.choices(
+                    clinical_statuses, weights=[5, 15, 25, 30, 15, 10]
+                )[0]
+
+            if severity == "low":
+                emotion = random.choice(["joy", "gratitude", "hope", "admiration", "curiosity"])
+            elif severity == "moderate":
+                emotion = random.choice(["confusion", "disappointment", "sadness", "fear", "embarrassment"])
+            else:
+                emotion = random.choice(["sadness", "fear", "anger", "disappointment", "confusion"])
+
+            nlp_data.append({
+                "participant_id": f"NEPS-{country}-{random.randint(1, 150):04d}",
+                "response_id": f"NLP-{uuid.uuid4().hex[:8].upper()}",
+                "response_type": random.choice(response_types),
+                "collection_date": (datetime.now() - timedelta(days=random.randint(1, 180))).strftime("%Y-%m-%d"),
+                "country": country,
+                "site": site,
+                "question_prompt": random.choice(question_prompts),
+                "response_text": narrative,
+                "word_count": len(narrative.split()),
+                "language": "en",
+                "translated": False,
+                "severity_level": severity,
+                "anxiety_level": random.choice(["low", "moderate", "high"]) if severity != "low" else "low",
+                "depression_level": random.choice(["low", "moderate", "high"]) if severity != "low" else "low",
+                "stress_level": random.choice(["low", "moderate", "high"]),
+                "emotional_label": emotion,
+                "clinical_status": clinical_status,
+                "suicidality_flag": "yes" if clinical_status in ["suicidal_ideation", "severe_distress"] else "no",
+                "requires_referral": "yes" if severity == "high" or clinical_status in ["suicidal_ideation", "severe_distress"] else "no",
+                "alert_priority": "p0" if clinical_status in ["suicidal_ideation", "severe_distress"] else ("p1" if severity == "high" else "p2"),
+                "thematic_codes": random.sample(
+                    ["academic_pressure", "family_conflict", "financial_stress", "social_isolation", 
+                     "identity_crisis", "substance_use", "bullying", "health_concerns"],
+                    k=random.randint(1, 3)
+                ),
+                "sentiment_manual": random.choice(["negative", "neutral", "positive"]),
+                "sentiment_score": round(random.uniform(0.1, 0.9) if severity == "low" else random.uniform(-0.8, 0.3), 2),
+            })
+
         return nlp_data
 
     # ─── PUBLIC METHODS ─────────────────────────────────────────────
@@ -503,12 +596,25 @@ class MockDataStore:
         self.referrals.append(referral)
         return referral
 
-    def get_nlp_responses(self, response_type: Optional[str] = None, sentiment: Optional[str] = None) -> List[Dict]:
+    def get_nlp_responses(
+        self,
+        response_type: Optional[str] = None,
+        sentiment: Optional[str] = None,
+        severity: Optional[str] = None,
+        clinical_status: Optional[str] = None,
+        emotional_label: Optional[str] = None,
+    ) -> List[Dict]:
         results = self.nlp_responses.copy()
         if response_type:
             results = [r for r in results if r["response_type"] == response_type]
         if sentiment:
             results = [r for r in results if r["sentiment_manual"] == sentiment]
+        if severity:
+            results = [r for r in results if r["severity_level"] == severity]
+        if clinical_status:
+            results = [r for r in results if r["clinical_status"] == clinical_status]
+        if emotional_label:
+            results = [r for r in results if r["emotional_label"] == emotional_label]
         return results
 
     def get_stats(self) -> Dict:
@@ -556,15 +662,32 @@ def root():
 
 @app.get("/api/nlp/responses")
 def list_nlp_responses(
+    limit: int = Query(500, ge=1, le=2000),
+    severity: Optional[str] = Query(None, regex="^(low|moderate|high)$"),
+    clinical_status: Optional[str] = None,
+    emotional_label: Optional[str] = None,
     response_type: Optional[str] = None,
     sentiment: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=500)
 ):
-    """Get qualitative text responses for NLP processing."""
-    data = store.get_nlp_responses(response_type=response_type, sentiment=sentiment)
+    """Get qualitative text responses for NLP/ML training."""
+    data = store.get_nlp_responses(
+        response_type=response_type,
+        sentiment=sentiment,
+        severity=severity,
+        clinical_status=clinical_status,
+        emotional_label=emotional_label,
+    )
+    filtered = data[:limit]
     return {
-        "data": data[:limit],
-        "count": len(data),
+        "count": len(filtered),
+        "filters_applied": {
+            "severity": severity,
+            "clinical_status": clinical_status,
+            "emotional_label": emotional_label,
+            "response_type": response_type,
+            "sentiment": sentiment,
+        },
+        "data": filtered,
         "source": "mock"
     }
 
