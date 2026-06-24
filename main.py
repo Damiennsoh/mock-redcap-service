@@ -17,7 +17,7 @@ import os
 app = FastAPI(
     title="NEPS Mock REDCap API",
     description="Mock REDCap API for NEPS Digital development. Returns realistic longitudinal youth mental health data for Ghana, Sierra Leone, and Tanzania.",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -410,55 +410,191 @@ class MockDataStore:
             })
         return records
 
-    def _generate_nlp_data(self, count: int = 500) -> List[Dict]:
-        """Generate 500 qualitative text responses for ML training."""
-        narratives = {
-            "low": [
-                "School is fine, I manage my work okay.",
-                "Sometimes I feel tired but it's normal.",
-                "My friends are supportive, I feel okay.",
-                "I sleep well most nights, no big worries.",
-                "Exams are stressful but I can handle it.",
-                "I enjoy spending time with my family on weekends.",
-                "My teachers are helpful when I ask questions.",
-                "I feel hopeful about finishing school this year.",
-                "Playing football with friends helps me relax.",
-                "I had a good day today, nothing special happened.",
-            ],
-            "moderate": [
-                "School is very stressful. Exams make me anxious and I can't sleep well.",
-                "I feel alone sometimes. My friends don't fully understand me.",
-                "Teachers are supportive but the workload feels too much.",
-                "I worry about my family's money. It affects my concentration sometimes.",
-                "I feel overwhelmed by everything expected of me.",
-                "Sometimes I cry at night but I hide it from everyone.",
-                "My parents argue a lot and it makes me feel uneasy.",
-                "I struggle to focus in class because of personal issues.",
-                "I feel like I'm falling behind and can't catch up.",
-                "Social media makes me compare myself to others constantly.",
-            ],
-            "high": [
-                "Sometimes I think about giving up. Life feels too hard to continue.",
-                "I can't sleep anymore. My mind races with dark thoughts every night.",
-                "Nobody would notice if I disappeared. I feel completely invisible.",
-                "The pressure is crushing me. I see no way out of this darkness.",
-                "I've started hurting myself to feel something other than this emptiness.",
-                "I don't see the point in anything anymore. Everything feels meaningless.",
-                "I wish I could talk to someone but I'm afraid they'll judge me.",
-                "Every day feels the same — hopeless and exhausting.",
-                "I feel like a burden to my family and friends.",
-                "The pain inside is too much. I don't know how much longer I can hold on.",
-            ]
-        }
+    # ─── TEXT ANALYSIS HELPERS ───────────────────────────────────────
 
-        emotional_labels = [
-            "admiration", "joy", "confusion", "curiosity", "disappointment",
-            "embarrassment", "gratitude", "sadness", "fear", "anger", "hope"
+    @staticmethod
+    def _analyze_text(text: str) -> Dict:
+        """
+        Derive all NLP labels from the actual text content using a rule-based scorer.
+        Every label is deterministically computed from word patterns — no random assignment.
+        This ensures the ML training data contains real text-to-label correlations.
+        """
+        text_lower = text.lower()
+
+        # --- Word banks ---
+        positive_words = [
+            "fine", "okay", "good", "happy", "hopeful", "enjoy", "supportive",
+            "relax", "well", "manage", "handle", "great", "love", "grateful",
+            "peaceful", "calm", "motivated", "confident",
+        ]
+        negative_words = [
+            "stress", "anxious", "worried", "alone", "overwhelmed", "cry", "sad",
+            "tired", "struggle", "pressure", "hard", "uneasy", "falling behind",
+            "can't focus", "compare", "hide", "argue",
+        ]
+        crisis_words = [
+            "give up", "disappear", "invisible", "darkness", "hurting",
+            "meaningless", "burden", "no point", "can't hold on", "suicide",
+            "no way out", "hopeless", "emptiness", "pain inside",
+        ]
+        anxiety_words = [
+            "anxious", "nervous", "worry", "panic", "can't sleep", "racing",
+            "overwhelmed", "uneasy", "pressure",
+        ]
+        depression_words = [
+            "sad", "empty", "hopeless", "cry", "tired", "meaningless",
+            "no point", "burden", "darkness", "exhausting", "emptiness",
         ]
 
-        clinical_statuses = [
-            "normal", "stressed", "anxious", "depressed",
-            "suicidal_ideation", "severe_distress"
+        # --- Score word counts ---
+        pos_count = sum(1 for w in positive_words if w in text_lower)
+        neg_count = sum(1 for w in negative_words if w in text_lower)
+        crisis_count = sum(1 for w in crisis_words if w in text_lower)
+        anxiety_count = sum(1 for w in anxiety_words if w in text_lower)
+        depression_count = sum(1 for w in depression_words if w in text_lower)
+
+        # --- Sentiment score: -1.0 to +1.0 ---
+        total_emotion_words = pos_count + neg_count + crisis_count + 1  # +1 avoids div/0
+        raw_sentiment = (pos_count - neg_count - (crisis_count * 2)) / total_emotion_words
+        sentiment_score = round(max(-1.0, min(1.0, raw_sentiment)), 2)
+
+        # --- Severity: derived from sentiment + crisis words ---
+        if crisis_count >= 2 or sentiment_score < -0.6:
+            severity = "high"
+        elif neg_count >= 2 or sentiment_score < -0.2:
+            severity = "moderate"
+        else:
+            severity = "low"
+
+        # --- Emotional label: derived from dominant word pattern ---
+        if crisis_count > 0:
+            emotion = "sadness"
+        elif neg_count > pos_count:
+            if anxiety_count >= 1:
+                emotion = "fear"
+            elif depression_count >= 1:
+                emotion = "sadness"
+            else:
+                emotion = "disappointment"
+        elif pos_count > neg_count:
+            if any(w in text_lower for w in ["happy", "enjoy", "love"]):
+                emotion = "joy"
+            else:
+                emotion = "hope"
+        else:
+            emotion = "confusion"
+
+        # --- Clinical status: derived from severity + specific word patterns ---
+        if crisis_count >= 2:
+            clinical = "suicidal_ideation"
+        elif crisis_count == 1 or depression_count >= 3:
+            clinical = "depressed"
+        elif anxiety_count >= 2:
+            clinical = "anxious"
+        elif neg_count >= 2:
+            clinical = "stressed"
+        else:
+            clinical = "normal"
+
+        # --- Sub-scores: derived from word counts ---
+        anxiety_level = "high" if anxiety_count >= 2 else ("moderate" if anxiety_count == 1 else "low")
+        depression_level = "high" if depression_count >= 2 else ("moderate" if depression_count == 1 else "low")
+        stress_level = "high" if any(w in text_lower for w in ["stress", "overwhelmed", "pressure"]) else "low"
+
+        # --- Sentiment manual label ---
+        if sentiment_score > 0.1:
+            sentiment_manual = "positive"
+        elif sentiment_score < -0.1:
+            sentiment_manual = "negative"
+        else:
+            sentiment_manual = "neutral"
+
+        return {
+            "sentiment_score": sentiment_score,
+            "sentiment_manual": sentiment_manual,
+            "severity_level": severity,
+            "emotional_label": emotion,
+            "clinical_status": clinical,
+            "anxiety_level": anxiety_level,
+            "depression_level": depression_level,
+            "stress_level": stress_level,
+            "suicidality_flag": "yes" if crisis_count >= 2 else "no",
+            "requires_referral": "yes" if severity == "high" or clinical == "suicidal_ideation" else "no",
+            "alert_priority": "p0" if clinical == "suicidal_ideation" else ("p1" if severity == "high" else "p2"),
+        }
+
+    @staticmethod
+    def _derive_themes(text: str) -> List[str]:
+        """Extract thematic codes from text content — no random sampling."""
+        themes = []
+        text_lower = text.lower()
+        if any(w in text_lower for w in ["school", "exam", "teacher", "class", "homework", "workload"]):
+            themes.append("academic_pressure")
+        if any(w in text_lower for w in ["family", "parent", "mother", "father", "home"]):
+            themes.append("family_conflict")
+        if any(w in text_lower for w in ["money", "financial", "afford", "poor"]):
+            themes.append("financial_stress")
+        if any(w in text_lower for w in ["friend", "alone", "lonely", "isolated", "social"]):
+            themes.append("social_isolation")
+        if any(w in text_lower for w in ["sleep", "tired", "exhausted", "health", "hurt"]):
+            themes.append("health_concerns")
+        if any(w in text_lower for w in ["dark", "pain", "give up", "meaningless", "no point", "disappear"]):
+            themes.append("crisis_indicators")
+        return themes or ["general_distress"]
+
+    def _generate_nlp_data(self, count: int = 500) -> List[Dict]:
+        """
+        Generate qualitative text responses for ML training.
+
+        IMPORTANT: Every label (sentiment_score, emotional_label, severity_level,
+        clinical_status, anxiety_level, depression_level, stress_level) is derived
+        directly from the response_text using _analyze_text(). No random label
+        assignment — the model will learn real text-to-label correlations.
+        """
+        # Templates crafted to produce specific, predictable label profiles.
+        # Each has enough signal words to yield deterministic scores from _analyze_text().
+        templates = [
+            # ── LOW severity / POSITIVE sentiment ──────────────────────────────
+            "School is fine, I manage my work okay. My friends are supportive and I feel hopeful about finishing this year.",
+            "I enjoy spending time with my family on weekends. Playing football helps me relax and I sleep well most nights.",
+            "My teachers are helpful when I ask questions. I had a good day today, nothing special happened.",
+            "I feel okay about school. The workload is manageable and I feel good when I finish my assignments.",
+            "Things are going well. I am grateful for my supportive family and I feel hopeful about the future.",
+            "I sleep well and I manage my daily tasks okay. My friends keep me motivated and I feel calm.",
+            "Life is good right now. I enjoy my studies and I feel confident about my upcoming exams.",
+            "I had a great week. My family was supportive and I feel grateful for what I have.",
+
+            # ── MODERATE severity / MIXED sentiment ────────────────────────────
+            "School is very stressful. Exams make me anxious and I can't sleep well at night.",
+            "I feel alone sometimes. My friends don't fully understand me and I worry about my situation.",
+            "The workload feels too much. I feel overwhelmed by everything expected of me at school.",
+            "I worry about my family's money and it affects my concentration. Sometimes I cry but I hide it.",
+            "I feel overwhelmed and I struggle to focus. The pressure from school is too much right now.",
+            "Sometimes I cry at night because I feel alone and sad. I hide it from my friends and family.",
+            "My parents argue a lot and it makes me feel uneasy and anxious. I struggle to sleep well.",
+            "I feel like I'm falling behind and can't catch up. The stress is making me anxious and tired.",
+            "Social media makes me compare myself to others constantly. I feel sad and overwhelmed by it.",
+            "I feel alone and worried most days. The academic pressure is too much and I can't sleep.",
+
+            # ── HIGH severity / CRISIS ─────────────────────────────────────────
+            "Sometimes I think about giving up. Life feels too hard to continue and the darkness is overwhelming.",
+            "I can't sleep anymore. My mind races with dark thoughts every night. I see no way out.",
+            "Nobody would notice if I disappeared. I feel completely invisible and there is no point anymore.",
+            "The pressure is crushing me. I see no way out of this darkness. I feel like a burden to everyone.",
+            "I've started hurting myself to feel something. I don't see the point in anything, everything is meaningless.",
+            "I don't see the point in anything anymore. Everything feels meaningless and I feel empty inside.",
+            "Every day feels the same — hopeless and exhausting. I feel like a burden to my family and friends.",
+            "The pain inside is too much. I don't know how much longer I can hold on. I feel completely invisible.",
+            "I feel like giving up. The darkness is too heavy. I can't hold on much longer. There is no point.",
+            "Life feels meaningless and I see no way out. I feel like a burden and want to disappear.",
+        ]
+
+        variations = [
+            " Today was especially difficult.",
+            " I don't know who to talk to.",
+            " This has been going on for months.",
+            " I wish things were different.",
+            "",  # No variation
         ]
 
         question_prompts = [
@@ -484,34 +620,14 @@ class MockDataStore:
 
         nlp_data = []
         for _ in range(count):
-            severity = random.choices(
-                ["low", "moderate", "high"], 
-                weights=[50, 35, 15]
-            )[0]
-
-            narrative = random.choice(narratives[severity])
+            base_text = random.choice(templates)
+            text = base_text + random.choice(variations)
             country = random.choice(countries)
             site = random.choice(sites[country])
 
-            if severity == "low":
-                clinical_status = random.choices(
-                    clinical_statuses, weights=[85, 10, 3, 1, 0, 1]
-                )[0]
-            elif severity == "moderate":
-                clinical_status = random.choices(
-                    clinical_statuses, weights=[20, 40, 25, 12, 2, 1]
-                )[0]
-            else:
-                clinical_status = random.choices(
-                    clinical_statuses, weights=[5, 15, 25, 30, 15, 10]
-                )[0]
-
-            if severity == "low":
-                emotion = random.choice(["joy", "gratitude", "hope", "admiration", "curiosity"])
-            elif severity == "moderate":
-                emotion = random.choice(["confusion", "disappointment", "sadness", "fear", "embarrassment"])
-            else:
-                emotion = random.choice(["sadness", "fear", "anger", "disappointment", "confusion"])
+            # ALL labels derived from text content — not randomly assigned
+            analysis = self._analyze_text(text)
+            themes = self._derive_themes(text)
 
             nlp_data.append({
                 "participant_id": f"NEPS-{country}-{random.randint(1, 150):04d}",
@@ -521,26 +637,23 @@ class MockDataStore:
                 "country": country,
                 "site": site,
                 "question_prompt": random.choice(question_prompts),
-                "response_text": narrative,
-                "word_count": len(narrative.split()),
+                "response_text": text,
+                "word_count": len(text.split()),
                 "language": "en",
                 "translated": False,
-                "severity_level": severity,
-                "anxiety_level": random.choice(["low", "moderate", "high"]) if severity != "low" else "low",
-                "depression_level": random.choice(["low", "moderate", "high"]) if severity != "low" else "low",
-                "stress_level": random.choice(["low", "moderate", "high"]),
-                "emotional_label": emotion,
-                "clinical_status": clinical_status,
-                "suicidality_flag": "yes" if clinical_status in ["suicidal_ideation", "severe_distress"] else "no",
-                "requires_referral": "yes" if severity == "high" or clinical_status in ["suicidal_ideation", "severe_distress"] else "no",
-                "alert_priority": "p0" if clinical_status in ["suicidal_ideation", "severe_distress"] else ("p1" if severity == "high" else "p2"),
-                "thematic_codes": random.sample(
-                    ["academic_pressure", "family_conflict", "financial_stress", "social_isolation", 
-                     "identity_crisis", "substance_use", "bullying", "health_concerns"],
-                    k=random.randint(1, 3)
-                ),
-                "sentiment_manual": random.choice(["negative", "neutral", "positive"]),
-                "sentiment_score": round(random.uniform(0.1, 0.9) if severity == "low" else random.uniform(-0.8, 0.3), 2),
+                # ── Labels derived from text, not random ──
+                "severity_level": analysis["severity_level"],
+                "anxiety_level": analysis["anxiety_level"],
+                "depression_level": analysis["depression_level"],
+                "stress_level": analysis["stress_level"],
+                "emotional_label": analysis["emotional_label"],
+                "clinical_status": analysis["clinical_status"],
+                "sentiment_score": analysis["sentiment_score"],
+                "sentiment_manual": analysis["sentiment_manual"],
+                "suicidality_flag": analysis["suicidality_flag"],
+                "requires_referral": analysis["requires_referral"],
+                "alert_priority": analysis["alert_priority"],
+                "thematic_codes": themes,
             })
 
         return nlp_data
@@ -633,7 +746,7 @@ class MockDataStore:
             "wp6_enrolled": len(self.wp6_sessions),
             "nlp_responses_count": len(self.nlp_responses),
             "source": "mock",
-            "version": "0.1.1"
+            "version": "0.2.0"
         }
 
 # Initialize store
@@ -645,7 +758,7 @@ store = MockDataStore()
 def root():
     return {
         "service": "NEPS Mock REDCap API",
-        "version": "0.1.1",
+        "version": "0.2.0",
         "docs": "/docs",
         "endpoints": {
             "participants": "/api/participants",
