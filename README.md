@@ -30,25 +30,27 @@ The repository contains the following pre-generated files for the ML/AI and Data
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Service info |
-| `/health` | GET | Health check |
-| `/api/participants` | GET | List participants |
-| `/api/participants/{id}` | GET | Get participant |
-| `/api/participants/{id}/monthly-reports` | GET | Get participant's monthly reports |
-| `/api/participants/{id}/comprehensive-waves` | GET | Get participant's comprehensive waves |
-| `/api/monthly-reports` | GET | List monthly reports |
-| `/api/comprehensive-waves` | GET | List comprehensive waves |
-| `/api/distress-screenings` | GET | Get safeguarding alerts |
-| `/api/wp6-sessions/{id}` | GET | Get WP6 sessions |
-| `/api/consent/{id}` | GET | Get consent record |
-| `/api/referrals` | POST | Create referral |
-| `/api/nlp/responses` | GET | Get qualitative text responses (**Default limit: 2000, Max: 5000** for bulk extraction) |
-| `/api/participants/{id}/nlp-responses` | GET | Get NLP responses for a specific participant |
-| `/api/stats` | GET | Project statistics |
-| `/api/export/records` | GET | Export all records |
-| `/api/field-mapping` | GET | Current field mapping |
+All endpoints are live on Render and can be tested directly in the browser:
+
+| Endpoint | Method | Live Link / Example | Description |
+|----------|--------|---------------------|-------------|
+| `/` | GET | [Link](https://mock-redcap-service.onrender.com/) | Service info & version |
+| `/health` | GET | [Link](https://mock-redcap-service.onrender.com/health) | Service health status |
+| `/api/participants` | GET | [Link](https://mock-redcap-service.onrender.com/api/participants) | List participants (default limit: 100) |
+| `/api/participants/{id}` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/participants/NEPS-GHA-0001) | Get participant by ID |
+| `/api/participants/{id}/monthly-reports` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/participants/NEPS-GHA-0001/monthly-reports) | Get participant's longitudinal monthly reports |
+| `/api/participants/{id}/comprehensive-waves` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/participants/NEPS-GHA-0001/comprehensive-waves) | Get participant's comprehensive wave survey reports |
+| `/api/monthly-reports` | GET | [Link](https://mock-redcap-service.onrender.com/api/monthly-reports) | List all monthly reports (default limit: 100) |
+| `/api/comprehensive-waves` | GET | [Link](https://mock-redcap-service.onrender.com/api/comprehensive-waves) | List all comprehensive waves (default limit: 100) |
+| `/api/distress-screenings` | GET | [Link](https://mock-redcap-service.onrender.com/api/distress-screenings) | Get safeguarding alerts & distress screenings |
+| `/api/wp6-sessions/{id}` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/wp6-sessions/NEPS-GHA-0001) | Get WP6 cognitive behavioral session logs |
+| `/api/consent/{id}` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/consent/NEPS-GHA-0001) | Get consent and assent record status |
+| `/api/referrals` | POST | *Write-only endpoint* | Create a safeguarding referral |
+| `/api/nlp/responses` | GET | **[Link (Full 2000-row Dataset)](https://mock-redcap-service.onrender.com/api/nlp/responses)** | Get qualitative text responses (**Default limit: 2000, Max: 5000** for bulk extraction) |
+| `/api/participants/{id}/nlp-responses` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/participants/NEPS-GHA-0001/nlp-responses) | Get NLP responses for a specific participant |
+| `/api/stats` | GET | [Link](https://mock-redcap-service.onrender.com/api/stats) | Project-wide statistics (aggregate metrics) |
+| `/api/export/records` | GET | [Link](https://mock-redcap-service.onrender.com/api/export/records) | Export all records in REDCap-compatible JSON format |
+| `/api/field-mapping` | GET | [Link](https://mock-redcap-service.onrender.com/api/field-mapping) | Current CRF-to-internal field mapping |
 
 ---
 
