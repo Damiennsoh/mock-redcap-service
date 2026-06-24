@@ -143,13 +143,14 @@ class NLPResponse(BaseModel):
     response_id: str
     response_type: str
     collection_date: str
+    month: Optional[str] = None
     country: str
     site: str
     question_prompt: str
     response_text: str
     word_count: int
     language: str
-    translated: bool
+    translated: Optional[bool] = False
     severity_level: str
     anxiety_level: str
     depression_level: str
@@ -203,13 +204,13 @@ class MockDataStore:
         self.consent_records = self._generate_consent_records()
         # Load pre-generated 2000-row semantically correlated dataset if available, otherwise fall back to generator
         import json
-        json_path = os.path.join(os.path.dirname(__file__), "NEPS_NLP_Mock_Dataset_2000.json")
+        json_path = os.path.join(os.path.dirname(__file__), "NEPS_NLP_Mock_Dataset_2000_v2.json")
         if os.path.exists(json_path):
             try:
                 with open(json_path, "r", encoding="utf-8") as f:
                     self.nlp_responses = json.load(f)
             except Exception as e:
-                print(f"Error loading NEPS_NLP_Mock_Dataset_2000.json: {e}. Falling back to generator.")
+                print(f"Error loading NEPS_NLP_Mock_Dataset_2000_v2.json: {e}. Falling back to generator.")
                 self.nlp_responses = self._generate_nlp_data()
         else:
             self.nlp_responses = self._generate_nlp_data()
@@ -512,13 +513,17 @@ class MockDataStore:
         depression_level = "high" if depression_count >= 2 else ("moderate" if depression_count == 1 else "low")
         stress_level = "high" if any(w in text_lower for w in ["stress", "overwhelmed", "pressure"]) else "low"
 
-        # --- Sentiment manual label ---
-        if sentiment_score > 0.1:
+        # --- Sentiment manual label (5-tier classification) ---
+        if sentiment_score >= 0.5:
             sentiment_manual = "positive"
-        elif sentiment_score < -0.1:
-            sentiment_manual = "negative"
-        else:
+        elif sentiment_score >= 0.1:
+            sentiment_manual = "mildly_positive"
+        elif sentiment_score >= -0.1:
             sentiment_manual = "neutral"
+        elif sentiment_score > -0.5:
+            sentiment_manual = "mildly_negative"
+        else:
+            sentiment_manual = "negative"
 
         return {
             "sentiment_score": sentiment_score,
@@ -640,11 +645,16 @@ class MockDataStore:
             analysis = self._analyze_text(text)
             themes = self._derive_themes(text)
 
+            date_obj = datetime.now() - timedelta(days=random.randint(1, 180))
+            collection_date = date_obj.strftime("%Y-%m-%d")
+            month_name = date_obj.strftime("%B")
+
             nlp_data.append({
                 "participant_id": f"NEPS-{country}-{random.randint(1, 150):04d}",
                 "response_id": f"NLP-{uuid.uuid4().hex[:8].upper()}",
                 "response_type": random.choice(response_types),
-                "collection_date": (datetime.now() - timedelta(days=random.randint(1, 180))).strftime("%Y-%m-%d"),
+                "collection_date": collection_date,
+                "month": month_name,
                 "country": country,
                 "site": site,
                 "question_prompt": random.choice(question_prompts),

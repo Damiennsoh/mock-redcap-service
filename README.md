@@ -10,20 +10,32 @@ The mock API is currently deployed on Render!
 - **Docs**: https://mock-redcap-service.onrender.com/docs
 - **Health Check**: https://mock-redcap-service.onrender.com/health
 
-## 🧠 Semantically Correlated NLP Dataset (v0.2.0)
+## 🧠 Semantically Correlated NLP Dataset (v2)
 
-To resolve issues with random label noise in ML training, a **2000-row semantically correlated NLP dataset** has been integrated directly into the service. 
+To resolve issues with random label noise in ML training, an upgraded **2000-row semantically correlated NLP dataset (v2)** has been integrated directly into the service. 
 
-Instead of random label assignment:
-- **Sentiment scores** (`sentiment_score` & `sentiment_manual`) are computed from positive/negative word counts in the actual narrative.
-- **Severity levels** (`severity_level`) are determined by crisis word presence and sentiment thresholds.
-- **Clinical statuses** (`clinical_status`) are mapped from specific anxiety, depression, and stress word patterns.
-- **Thematic codes** (`thematic_codes`) are extracted directly from context keywords.
+### What's New in v2
+1. **Restored `sentiment_manual` & `month` columns**: The dataset now contains exactly **23 columns** matching the full production schema.
+2. **Deterministic Text-to-Label Derivation**: Every single label is computed directly from the words inside the `response_text` — zero random noise.
+3. **5-Tier Sentiment Classification**: The `sentiment_manual` field is mapped according to the following rules:
+   * **`positive`** (sentiment_score $\ge 0.5$): *e.g., "I feel proud of myself. My family celebrated with me."*
+   * **`mildly_positive`** (0.1 to 0.49): *e.g., "I trust my judgment and problem-solving skills."*
+   * **`neutral`** (-0.1 to 0.1): *e.g., "I feel calm and in control of my space."*
+   * **`mildly_negative`** (-0.49 to -0.11): *e.g., "I feel disappointed in myself."*
+   * **`negative`** (sentiment_score $\le -0.5$): *e.g., "Life feels too hard to continue. Nobody would notice if I disappeared."*
+
+### Restored 23-Column Schema
+```csv
+participant_id, response_id, response_type, collection_date, month, country, site,
+question_prompt, response_text, word_count, language, severity_level, anxiety_level,
+depression_level, stress_level, emotional_label, clinical_status, sentiment_score,
+sentiment_manual, suicidality_flag, requires_referral, alert_priority, thematic_codes
+```
 
 ### Seed Dataset Files (Root Directory)
 The repository contains the following pre-generated files for the ML/AI and Data Platform teams:
-1. **[NEPS_NLP_Mock_Dataset_2000.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_NLP_Mock_Dataset_2000.json)**: The full 2000-record dataset in JSON format. Loaded directly at startup.
-2. **[NEPS_NLP_Mock_Dataset_2000.csv](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_NLP_Mock_Dataset_2000.csv)**: Spreadsheet-friendly version of the dataset.
+1. **[NEPS_NLP_Mock_Dataset_2000_v2.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_NLP_Mock_Dataset_2000_v2.json)**: The full 2000-record dataset in JSON format. Loaded directly at startup.
+2. **[NEPS_NLP_Mock_Dataset_2000_v2.csv](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_NLP_Mock_Dataset_2000_v2.csv)**: Spreadsheet-friendly version of the dataset.
 3. **[NEPS_NLP_Dataset_Summary.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_NLP_Dataset_Summary.json)**: Summary report outlining label and theme distributions (15+ emotions, 15+ themes).
 
 ---
