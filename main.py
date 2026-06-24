@@ -201,7 +201,18 @@ class MockDataStore:
         self.distress_screenings = self._generate_distress_screenings()
         self.wp6_sessions = self._generate_wp6_sessions()
         self.consent_records = self._generate_consent_records()
-        self.nlp_responses = self._generate_nlp_data()
+        # Load pre-generated 2000-row semantically correlated dataset if available, otherwise fall back to generator
+        import json
+        json_path = os.path.join(os.path.dirname(__file__), "NEPS_NLP_Mock_Dataset_2000.json")
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    self.nlp_responses = json.load(f)
+            except Exception as e:
+                print(f"Error loading NEPS_NLP_Mock_Dataset_2000.json: {e}. Falling back to generator.")
+                self.nlp_responses = self._generate_nlp_data()
+        else:
+            self.nlp_responses = self._generate_nlp_data()
         self.referrals = []
 
     def _generate_participants(self, count: int = 150) -> List[Dict]:
@@ -775,7 +786,7 @@ def root():
 
 @app.get("/api/nlp/responses")
 def list_nlp_responses(
-    limit: int = Query(500, ge=1, le=2000),
+    limit: int = Query(2000, ge=1, le=5000),
     severity: Optional[str] = Query(None, regex="^(low|moderate|high)$"),
     clinical_status: Optional[str] = None,
     emotional_label: Optional[str] = None,
