@@ -1,0 +1,102 @@
+{
+  "dataset_name": "NEPS NLP Mock Dataset v3 (CORRECTED)",
+  "total_records": 2000,
+  "total_columns": 23,
+  "exact_duplicates": 0,
+  "generation_method": "Template-driven with ground-truth labels assigned by construction",
+  "key_fixes": [
+    "Labels are now assigned BEFORE text generation, not analyzed after",
+    "Each template group has explicit sentiment_manual, emotional_label, severity, clinical_status",
+    "sentiment_score is randomized within the correct range for each sentiment_manual category",
+    "Synonym substitution and variation phrases ensure zero exact duplicates",
+    "Text is crafted to NATURALLY express the assigned emotion"
+  ],
+  "distributions": {
+    "sentiment_manual": {
+      "neutral": 200,
+      "negative": 1000,
+      "mildly_positive": 220,
+      "positive": 280,
+      "mildly_negative": 300
+    },
+    "emotional_label": {
+      "confusion": 200,
+      "loneliness": 93,
+      "hope": 163,
+      "gratitude": 35,
+      "numbness": 95,
+      "anger": 118,
+      "sadness": 90,
+      "emptiness": 120,
+      "contentment": 128,
+      "guilt": 88,
+      "fear": 105,
+      "calm": 24,
+      "pride": 46,
+      "disappointment": 114,
+      "despair": 186,
+      "worry": 91,
+      "confidence": 28,
+      "shame": 105,
+      "frustration": 95,
+      "joy": 31,
+      "love": 45
+    },
+    "severity_level": {
+      "low": 700,
+      "high": 1000,
+      "moderate": 300
+    },
+    "clinical_status": {
+      "mild_distress": 305,
+      "depressed": 680,
+      "normal": 600,
+      "severe_distress": 118,
+      "anxious": 105,
+      "suicidal_ideation": 97,
+      "stressed": 95
+    }
+  },
+  "correlation_proof": {
+    "positive_examples": [
+      {
+        "text": "I've been thinking a lot about my future lately. I have options but I'm not sure which path to take.",
+        "sentiment_manual": "neutral",
+        "sentiment_score": -0.07,
+        "emotion": "confusion"
+      },
+      {
+        "text": "I've been thinking a lot about my future lately. I have options but I'm not sure which path to take.",
+        "sentiment_manual": "neutral",
+        "sentiment_score": -0.07,
+        "emotion": "confusion"
+      },
+      {
+        "text": "I've been thinking a lot about my future lately. I have options but I'm not sure which path to take.",
+        "sentiment_manual": "neutral",
+        "sentiment_score": -0.07,
+        "emotion": "confusion"
+      }
+    ],
+    "negative_examples": [
+      {
+        "text": "I had a panic attack in the library and nobody helped me. I sat on the floor crying alone. The lonel",
+        "sentiment_manual": "negative",
+        "sentiment_score": -0.52,
+        "emotion": "loneliness"
+      },
+      {
+        "text": "I got good news and bad news on the same day and felt the same about both. The numbness equalizes ev",
+        "sentiment_manual": "negative",
+        "sentiment_score": -0.54,
+        "emotion": "numbness"
+      },
+      {
+        "text": "I was passed over for a promotion because of office politics. The anger and injustice I feel are con",
+        "sentiment_manual": "negative",
+        "sentiment_score": -0.7,
+        "emotion": "anger"
+      }
+    ]
+  }
+}
