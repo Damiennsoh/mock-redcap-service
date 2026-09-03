@@ -17,7 +17,7 @@ import os
 app = FastAPI(
     title="NEPS Mock REDCap API",
     description="Mock REDCap API for NEPS Digital development. Returns realistic longitudinal youth mental health data for Ghana, Sierra Leone, and Tanzania.",
-    version="0.2.0",
+    version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -41,6 +41,10 @@ class Participant(BaseModel):
     cohort_status: str
     consent_status: str
     phone_contact: str
+    employment_status: str
+    food_security: str
+    healthcare_access: str
+    socioeconomic_status: str
 
 class MonthlyReport(BaseModel):
     participant_id: str
@@ -60,6 +64,13 @@ class MonthlyReport(BaseModel):
     loneliness: float
     risk_flag: str
     requires_follow_up: bool
+    mood_score: float
+    sleep_quality_score: float
+    fatigue_score: float
+    attendance_score: float
+    coping_score: float
+    substance_abuse_score: float
+    suicidality_score: float
 
 class ComprehensiveWave(BaseModel):
     participant_id: str
@@ -185,8 +196,18 @@ REDCAP_TO_INTERNAL = {
     "cohort_status": "cohort_status",
     "consent_status": "consent_status",
     "phone_contact": "phone_contact",
+    "employment_status": "employment_status",
+    "food_security": "food_security",
+    "healthcare_access": "healthcare_access",
+    "socioeconomic_status": "socioeconomic_status",
+    "mood_score": "mood_score",
+    "sleep_quality_score": "sleep_quality_score",
+    "fatigue_score": "fatigue_score",
+    "attendance_score": "attendance_score",
+    "coping_score": "coping_score",
+    "substance_abuse_score": "substance_abuse_score",
+    "suicidality_score": "suicidality_score",
 }
-
 INTERNAL_TO_REDCAP = {v: k for k, v in REDCAP_TO_INTERNAL.items()}
 
 # ─── MOCK DATA STORE ──────────────────────────────────────────────
@@ -196,18 +217,54 @@ class MockDataStore:
 
     def __init__(self, seed: int = 42):
         random.seed(seed)
-        self.participants = self._generate_participants()
-        self.monthly_reports = self._generate_monthly_reports()
+        import json
+        base_dir = os.path.dirname(__file__)
+
+        # --- Load pre-generated participants (150 rows, 16 fields) ---
+        p_path = os.path.join(base_dir, "participants_updated.json")
+        if os.path.exists(p_path):
+            try:
+                with open(p_path, "r", encoding="utf-8") as f:
+                    self.participants = json.load(f)
+                print(f"Loaded {len(self.participants)} participants from participants_updated.json")
+            except Exception as e:
+                print(f"Error loading participants_updated.json: {e}. Falling back to generator.")
+                self.participants = self._generate_participants()
+        else:
+            self.participants = self._generate_participants()
+
+        # --- Load pre-generated monthly reports (3600 rows, 24 fields) ---
+        m_path = os.path.join(base_dir, "monthly_reports_updated.json")
+        if os.path.exists(m_path):
+            try:
+                with open(m_path, "r", encoding="utf-8") as f:
+                    raw_monthly = json.load(f)
+                # Convert flat list -> Dict[str, List[Dict]] keyed by participant_id
+                self.monthly_reports: Dict[str, List[Dict]] = {}
+                for r in raw_monthly:
+                    pid = r["participant_id"]
+                    if pid not in self.monthly_reports:
+                        self.monthly_reports[pid] = []
+                    self.monthly_reports[pid].append(r)
+                total = sum(len(v) for v in self.monthly_reports.values())
+                print(f"Loaded {total} monthly reports from monthly_reports_updated.json ({len(self.monthly_reports)} participants)")
+            except Exception as e:
+                print(f"Error loading monthly_reports_updated.json: {e}. Falling back to generator.")
+                self.monthly_reports = self._generate_monthly_reports()
+        else:
+            self.monthly_reports = self._generate_monthly_reports()
+
+        # --- Everything below iterates self.participants, no ID drift ---
         self.comprehensive_waves = self._generate_comprehensive_waves()
         self.distress_screenings = self._generate_distress_screenings()
         self.wp6_sessions = self._generate_wp6_sessions()
         self.consent_records = self._generate_consent_records()
-        # Load pre-generated 2000-row semantically correlated dataset if available, otherwise fall back to generator
-        import json
-        json_path = os.path.join(os.path.dirname(__file__), "NEPS_NLP_Mock_Dataset_2000_CORRECTED.json")
-        if os.path.exists(json_path):
+
+        # --- Load pre-generated 2000-row semantically correlated NLP dataset ---
+        nlp_path = os.path.join(base_dir, "NEPS_NLP_Mock_Dataset_2000_CORRECTED.json")
+        if os.path.exists(nlp_path):
             try:
-                with open(json_path, "r", encoding="utf-8") as f:
+                with open(nlp_path, "r", encoding="utf-8") as f:
                     self.nlp_responses = json.load(f)
             except Exception as e:
                 print(f"Error loading NEPS_NLP_Mock_Dataset_2000_CORRECTED.json: {e}. Falling back to generator.")
@@ -766,8 +823,11 @@ class MockDataStore:
             "open_referrals": len([r for r in self.referrals if r["status"] == "initiated"]),
             "wp6_enrolled": len(self.wp6_sessions),
             "nlp_responses_count": len(self.nlp_responses),
+            "fields_added_participant": 4,
+            "fields_added_monthly_report": 7,
+            "schema": "expanded_v3",
             "source": "mock",
-            "version": "0.2.0"
+            "version": "0.3.0"
         }
 
 # Initialize store
@@ -779,8 +839,9 @@ store = MockDataStore()
 def root():
     return {
         "service": "NEPS Mock REDCap API",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "docs": "/docs",
+        "schema": "expanded_v3",
         "endpoints": {
             "participants": "/api/participants",
             "monthly_reports": "/api/monthly-reports",

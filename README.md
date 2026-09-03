@@ -48,6 +48,88 @@ The repository contains the following verified files for the ML/AI and Data Plat
 
 ---
 
+## 📊 Expanded Structured Dataset (v3 Schema — Yasmine 14 + Socio-Economic)
+
+To support ML risk-prediction model training, **Version 0.3.0** integrates a validated 150-participant × 3600-report structured dataset. The approach is **additive-only** (no rebuild, no ID drift): all pre-existing fields, IDs, and the 2000-row NLP dataset remain *completely untouched*. Only the missing fields Yasmine requested are layered in.
+
+### What's New in v3 (0.3.0)
+
+1. **4 New Participant-Level Socio-Economic / Demographic Fields** (12 existing → **16 fields per participant**):
+   | Field | Allowed Values | Source (Yasmine Audio) |
+   |-------|---------------|----------------------|
+   | `employment_status` | `employed`, `unemployed`, `student`, `self-employed`, `casual_labor`, `not_applicable` | Audio 1 |
+   | `food_security` | `secure`, `mildly_insecure`, `moderately_insecure`, `severely_insecure` | Audio 1 |
+   | `healthcare_access` | `excellent`, `good`, `fair`, `poor`, `none` | Audio 1 |
+   | `socioeconomic_status` | `high`, `upper_middle`, `middle`, `lower_middle`, `low` | Audio 1 ("General economic factors") |
+
+2. **7 New Numeric Monthly Score Fields** (17 existing → **24 fields per monthly report**):
+   | Field | Range | Derivation | Source (Yasmine 14 #) |
+   |-------|-------|------------|----------------------|
+   | `mood_score` | 0–30 | New, inversely correlated with depression | #2 Mood score |
+   | `sleep_quality_score` | 0–30 | Numeric from `sleep_quality` categorical | #3 Sleep quality score |
+   | `fatigue_score` | 0–30 | Numeric from `fatigue_level` categorical | #7 Fatigue score |
+   | `attendance_score` | 0–25 | Normalized from `school_attendance_days` | #8 Attendance score |
+   | `coping_score` | 0–30 | New, inversely correlated with stress | #10 Coping score |
+   | `substance_abuse_score` | 0–20 | Numeric from `substance_use` categorical | #11 Substance abuse score |
+   | `suicidality_score` | 0–15 | Numeric from `suicidality_screening` categorical | #12 Suicidality score |
+
+3. **All 14 of Yasmine's Monthly Risk Parameters Are Now Present** (combination of 7 pre-existing numeric fields + 7 newly added above):
+   > Stress (existed) · Mood (new) · Sleep (new) · Anxiety (existed) · Depression (existed) · Functioning (existed) · Fatigue (new) · Attendance (new) · Social isolation (existed) · Coping (new) · Substance abuse (new) · Suicidality (new) · Self-esteem (existed) · Loneliness (existed)
+
+4. **Legacy Categorical Text Fields Preserved** — the text fields `sleep_quality`, `fatigue_level`, `substance_use`, and `suicidality_screening` are kept alongside their numeric counterparts for:
+   - REDCap CRF field-mapping parity (enumerators input these as Likert categories, not numbers)
+   - Clinical/human readability on the NEPS Analyst Dashboard
+   - SHAP / model-explainability (explain "Poor sleep quality", not "sleep_quality_score=5.3")
+   - Cross-field ETL data-quality validation (e.g., `sleep_quality=="Poor"` ⇒ `sleep_quality_score < 15`)
+
+### Clinical Realism & Semantic Correlations
+The v3 data is pre-validated with real-world effect sizes built in (r = Pearson correlations):
+- Depression ↔ Anxiety: r ≈ **+0.36**
+- Depression ↔ Mood score: r ≈ **−0.29** (higher depression → lower mood)
+- Depression ↔ Suicidality: r ≈ **+0.24**
+- Stress ↔ Coping score: r ≈ **−0.23** (higher stress → lower coping)
+- Loneliness ↔ Social Isolation: r ≈ **+0.20**
+- Risk flag distribution: **CRITICAL 9, HIGH 165, MEDIUM 125, LOW 3301**
+
+### Participant ID Scheme (Locked / No Regeneration)
+All 150 IDs are preserved from the prevalidated dataset — **no rebuild, no regeneration**. The 50/50/50 Ghana/Sierra Leone/Tanzania distribution uses prefixes:
+- Ghana: `NEPS-GHA-0001 … NEPS-GHA-0050`
+- Sierra Leone: `NEPS-SIE-0051 … NEPS-SIE-0100`
+- Tanzania: `NEPS-TAN-0101 … NEPS-TAN-0150`
+
+### How the Data Loads
+At startup, the `MockDataStore` in `main.py` prefers static prevalidated JSON files with fallbacks to the original dynamic generators:
+1. If `participants_updated.json` exists → load (else: dynamic generator)
+2. If `monthly_reports_updated.json` exists → load flat list, convert to `{pid: [records]}` dict (else: dynamic generator)
+3. `NEPS_NLP_Mock_Dataset_2000_CORRECTED.json` — loaded as before, unchanged
+4. Comprehensive waves, distress screenings, WP6 sessions, consent records, and referrals **iterated over loaded participant IDs only** → guaranteed no ID drift
+
+### v3 Seed Dataset Files (Root Directory)
+Added to the repository root for the ML/AI and Data Platform teams:
+1. **[participants_updated.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/participants_updated.json)** — 150 participants × 16 fields (loaded by the API at startup)
+2. **[monthly_reports_updated.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/monthly_reports_updated.json)** — 3600 monthly reports × 24 fields (loaded by the API at startup)
+3. **[NEPS_Mock_Data_Summary_v3.json](file:///d:/COMPUTER_SCIENCE/NEPS-PORTAL/mock-redcap-service/NEPS_Mock_Data_Summary_v3.json)** — v3 validation summary (risk distribution, semantic correlations, 14-score ranges)
+
+### Backward Compatibility Guarantees
+- **All old endpoint paths unchanged** — the same API URLs/query params work as in 0.2.0
+- **All old fields preserved** — no downstream code or test expecting the 0.2.0 field set breaks
+- **New fields are additive in Pydantic models**, TypeScript interfaces, and ETL schemas (typed as optional in downstream consumers)
+- **Dynamic generator fallbacks still exist** → reverting `main.py` without the JSON files restores 0.2.0 behavior exactly
+
+---
+
+## Cross-Repository Compatibility & Impact (For the Other NEPS Teams)
+
+| Repository | Team | File Changed | Impact | Breaking? | Required Action |
+|------------|------|--------------|--------|-----------|-----------------|
+| **neps-portal** | Frontend | `app/types/redcap.ts` | `Participant` +4 optional fields; `SurveyResponse` +7 optional numeric score fields | **No** — all `?` | None (fields silently flow through; use in UI/dash components when ready) |
+| **neps-backend** | Backend API | `app/services/redcap_mock.py` | Embedded REDCap mock: 4 socio-economic fields on participant dicts; 7 numeric ML scores on monthly responses with semantic correlations; text categoricals preserved | **No** — all existing code paths work | Set `REDCAP_MOCK_ENABLED=True` in local dev to use the richer mock |
+| **neps-data-platform** | Data Eng / ETL | `etl/transform/mock_schema.py` | `demographics` instrument: +4 `FieldDefinition`s; `monthly_self_report` instrument: +7 `FieldDefinition`s | **No** — wider schema, no removals | When running `etl_pipeline.py` the normalized output tables will include the new columns |
+| **mock-redcap-service** | Shared (Render deploy) | `main.py` + 3 new JSON data files | Service version bumped to `0.3.0`; static JSON loading; `get_stats()` reports `fields_added_participant=4`, `fields_added_monthly_report=7`, `schema="expanded_v3"` | **No** | Push to Render; verify `/api/stats` shows 150/3600/2000 before ML training runs |
+| **ml-ai / neps-model-factory** | ML (Yasmine) | (None — consumes the Render `/api` endpoint) | The 14 risk-assessment parameters Yasmine specified are now all present as numeric columns; 4 additional socio-economic features are available for feature-engineering | **No** — purely additive inputs | Update feature selector in training scripts to include `mood_score`, `sleep_quality_score`, `fatigue_score`, `attendance_score`, `coping_score`, `substance_abuse_score`, `suicidality_score` alongside existing `stress`, `anxiety`, `depression`, `daily_functioning`, `social_isolation`, `self_esteem`, `loneliness` |
+
+---
+
 ## API Endpoints
 
 All endpoints are live on Render and can be tested directly in the browser:
