@@ -1,0 +1,93 @@
+{
+  "dataset": "NEPS Mock REDCap API - Updated v3",
+  "generated_at": "2026-09-03",
+  "participants": {
+    "total": 150,
+    "countries": {
+      "Ghana": 50,
+      "Sierra Leone": 50,
+      "Tanzania": 50
+    },
+    "new_fields_added": [
+      "employment_status",
+      "food_security",
+      "healthcare_access",
+      "socioeconomic_status"
+    ],
+    "existing_fields_preserved": [
+      "participant_id",
+      "country",
+      "site",
+      "school",
+      "age",
+      "date_of_birth",
+      "gender",
+      "grade_level",
+      "enrollment_date",
+      "cohort_status",
+      "consent_status",
+      "phone_contact"
+    ]
+  },
+  "monthly_reports": {
+    "total_records": 3600,
+    "records_per_participant": 24,
+    "all_14_ml_score_fields": [
+      "stress",
+      "mood_score",
+      "sleep_quality_score",
+      "anxiety",
+      "depression",
+      "daily_functioning",
+      "fatigue_score",
+      "attendance_score",
+      "social_isolation",
+      "coping_score",
+      "substance_abuse_score",
+      "suicidality_score",
+      "self_esteem",
+      "loneliness"
+    ],
+    "new_score_fields": [
+      "mood_score",
+      "sleep_quality_score",
+      "fatigue_score",
+      "attendance_score",
+      "coping_score",
+      "substance_abuse_score",
+      "suicidality_score"
+    ],
+    "preserved_text_fields": [
+      "sleep_quality",
+      "fatigue_level",
+      "substance_use",
+      "suicidality_screening"
+    ],
+    "preserved_existing_numeric_fields": [
+      "anxiety",
+      "depression",
+      "stress",
+      "daily_functioning",
+      "school_attendance_days",
+      "social_isolation",
+      "self_esteem",
+      "loneliness",
+      "risk_flag",
+      "requires_follow_up"
+    ]
+  },
+  "correlation_validation": {
+    "depression_anxiety": 0.357,
+    "depression_mood": -0.292,
+    "depression_suicidality": 0.24,
+    "stress_coping": -0.233,
+    "loneliness_social_isolation": 0.201
+  },
+  "risk_distribution": {
+    "CRITICAL": 9,
+    "HIGH": 165,
+    "LOW": 3301,
+    "MEDIUM": 125
+  },
+  "note": "NLP dataset (2000 rows, 23 columns) and comprehensive waves remain UNCHANGED. Only participant demographics and monthly report scores were updated."
+}
