@@ -684,34 +684,39 @@ class MockDataStore:
         ]
 
         response_types = ["youth_narrative", "interview_transcript", "open_ended", "journal_entry"]
-        countries = ["GHA", "SLE", "TZA"]
-        sites = {
-            "GHA": ["KNUST", "Accra_Poly", "Tamale_Tech"],
-            "SLE": ["Fourah_Bay", "Eastern_Tech", "Bo_Campus"],
-            "TZA": ["UDSM", "Ardhi", "MUST"],
-        }
 
         nlp_data = []
+        p_list = self.participants if hasattr(self, "participants") and self.participants else []
+
         for _ in range(count):
             base_text = random.choice(templates)
             text = base_text + random.choice(variations)
-            country = random.choice(countries)
-            site = random.choice(sites[country])
 
-            # ALL labels derived from text content — not randomly assigned
+            if p_list:
+                p_item = random.choice(p_list)
+                pid = p_item["participant_id"]
+                country = p_item["country"]
+                site = p_item["site"]
+            else:
+                country_code = random.choice(["GHA", "SLE", "TZA"])
+                pid = f"NEPS-{country_code}-{random.randint(1, 50):04d}"
+                country = "Ghana" if country_code == "GHA" else ("Sierra Leone" if country_code == "SLE" else "Tanzania")
+                site = "Capital Site"
+
+            month_num = random.randint(1, 24)
             analysis = self._analyze_text(text)
             themes = self._derive_themes(text)
 
-            date_obj = datetime.now() - timedelta(days=random.randint(1, 180))
+            date_obj = datetime.now() - timedelta(days=30 * (24 - month_num))
             collection_date = date_obj.strftime("%Y-%m-%d")
-            month_name = date_obj.strftime("%B")
 
             nlp_data.append({
-                "participant_id": f"NEPS-{country}-{random.randint(1, 150):04d}",
+                "participant_id": pid,
                 "response_id": f"NLP-{uuid.uuid4().hex[:8].upper()}",
                 "response_type": random.choice(response_types),
                 "collection_date": collection_date,
-                "month": month_name,
+                "month": month_num,
+                "month_name": f"Month {month_num}",
                 "country": country,
                 "site": site,
                 "question_prompt": random.choice(question_prompts),
