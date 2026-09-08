@@ -913,7 +913,7 @@ def list_participants(
     country: Optional[str] = None,
     site: Optional[str] = None,
     status: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=500)
+    limit: int = Query(500, ge=1, le=500)
 ):
     """Get participant registry with filtering."""
     data = store.get_participants(country=country, site=site, status=status)
@@ -955,7 +955,7 @@ def get_participant_waves(participant_id: str):
 def list_monthly_reports(
     country: Optional[str] = None,
     risk_flag: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=1000)
+    limit: int = Query(5000, ge=1, le=5000)
 ):
     """Get all monthly reports with filtering."""
     reports = store.get_monthly_reports()
@@ -977,7 +977,7 @@ def list_monthly_reports(
 @app.get("/api/comprehensive-waves")
 def list_comprehensive_waves(
     wave_month: Optional[int] = None,
-    limit: int = Query(100, ge=1, le=1000)
+    limit: int = Query(2000, ge=1, le=2000)
 ):
     """Get all comprehensive waves with filtering."""
     waves = store.get_comprehensive_waves()
