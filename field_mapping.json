@@ -1,0 +1,71 @@
+{
+  "track_a": {
+    "name": "V3.1 Baseline Screening",
+    "version": "3.1",
+    "status": "VERIFIED",
+    "source": "NEPS Master CRF V3.1",
+    "endpoint": "/api/v31/baseline",
+    "field_count": 223,
+    "respondent_questions": 188,
+    "core_73_items": 73,
+    "forms": [
+      "neps31_registry",
+      "neps31_screening",
+      "neps31_cohort_interest",
+      "neps31_extended_baseline",
+      "neps31_yeb",
+      "neps31_ycad"
+    ],
+    "id_format": "MOCK-XXXX (no country encoding)",
+    "scoring": "Official V3.1 arithmetic via v31.py",
+    "notes": [
+      "This is baseline screening only, not longitudinal",
+      "All 73 core clinical items are present",
+      "Derived scores are calculated: EPI, ESI, SBI, K6, BRS, MSPSS, GSE, PFI, NSES",
+      "Branching logic is respected (hidden fields are BLANK, not 96)",
+      "Missingness patterns are applied (3-8% realistic missingness)"
+    ]
+  },
+  "track_b": {
+    "name": "Provisional Longitudinal Layer",
+    "version": "0.1-UNVERIFIED",
+    "status": "UNVERIFIED",
+    "source": "Not from V3.1 handover",
+    "endpoint": "/api/monthly-reports",
+    "components": [
+      "Monthly reports (14 scores × 24 months)",
+      "Comprehensive waves (600 records)",
+      "WP6 session logs",
+      "Suicidality screening",
+      "NLP responses (2000 records)"
+    ],
+    "notes": [
+      "⚠️ WARNING: No corresponding real CRF exists yet",
+      "Longitudinal follow-up forms are not defined in V3.1",
+      "Safeguarding alerts from suicidality screening require immediate escalation to Dr. Linda",
+      "When real monthly CRF arrives, update this section with field mapping"
+    ],
+    "safeguarding": {
+      "suicidality_screening": {
+        "critical": true,
+        "escalation": "Notify Dr. Linda - unverified module",
+        "note": "This is currently the only safeguarding trigger"
+      }
+    }
+  },
+  "future_real_mapping": {
+    "placeholder": "When real monthly follow-up CRF arrives from REDCap team, update this section",
+    "action_items": [
+      "Obtain actual REDCap project export",
+      "Extract longitudinal form definitions",
+      "Update field mappings from provisional to real",
+      "Remove UNVERIFIED tags when real CRF is deployed"
+    ]
+  },
+  "participant_linkage": {
+    "policy": "Same participant pool across Track A and Track B",
+    "track_a_ids": "MOCK-0001 to MOCK-0150",
+    "track_b_ids": "NEPS-GHA/SIE/TAN-XXXX (legacy format)",
+    "note": "Track A uses new MOCK format without country encoding per V3.1 contract"
+  }
+}

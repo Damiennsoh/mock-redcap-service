@@ -13,11 +13,12 @@ import random
 from datetime import datetime, timedelta
 import uuid
 import os
+from v31_baseline_generator import V31BaselineGenerator
 
 app = FastAPI(
     title="NEPS Mock REDCap API",
-    description="Mock REDCap API for NEPS Digital development. Returns realistic longitudinal youth mental health data for Ghana, Sierra Leone, and Tanzania.",
-    version="0.3.0",
+    description="Mock REDCap API for NEPS Digital development. Returns realistic longitudinal youth mental health data for Ghana, Sierra Leone, and Tanzania. Now includes V3.1 baseline screening endpoint.",
+    version="0.4.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -272,6 +273,15 @@ class MockDataStore:
         else:
             self.nlp_responses = self._generate_nlp_data()
         self.referrals = []
+
+        # --- V3.1 Baseline Screening Data (NEW) ---
+        self.v31_generator = V31BaselineGenerator(seed=42)
+        self.v31_baseline_records = self.v31_generator.generate_baseline_dataset(150)
+        self.v31_baseline_records = self.v31_generator.add_missingness_patterns(
+            self.v31_baseline_records, missingness_rate=0.05
+        )
+        self.v31_baseline_records = self.v31_generator.score_records(self.v31_baseline_records)
+        print(f"Generated {len(self.v31_baseline_records)} V3.1 baseline records")
 
     def _generate_participants(self, count: int = 150) -> List[Dict]:
         countries = {
@@ -1066,8 +1076,71 @@ def export_records(
 @app.get("/api/field-mapping")
 def get_field_mapping():
     """Get current field mapping (for CRF alignment)."""
+    import json
+    base_dir = os.path.dirname(__file__)
+    mapping_path = os.path.join(base_dir, "field_mapping.json")
+    
+    if os.path.exists(mapping_path):
+        with open(mapping_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    
     return {
         "redcap_to_internal": REDCAP_TO_INTERNAL,
         "internal_to_redcap": INTERNAL_TO_REDCAP,
         "note": "Update this mapping when real REDCap CRFs are finalized"
+    }
+
+@app.get("/api/v31/baseline")
+def get_v31_baseline():
+    """
+    Get V3.1 baseline screening records.
+    
+    This endpoint returns the full 223-field baseline screening per NEPS Master CRF V3.1.
+    This is a single-timepoint baseline instrument, not longitudinal.
+    
+    Track A - V3.1-Faithful Baseline (VERIFIED):
+    - All 223 fields from NEPS Master CRF V3.1
+    - 188 respondent questions across 8 instruments
+    - Scored using official V3.1 arithmetic
+    - Mock IDs: MOCK-0001 to MOCK-0150 (no country encoding)
+    
+    This is separate from the longitudinal monthly reports, which are Track B (provisional).
+    """
+    return {
+        "data": store.v31_baseline_records,
+        "metadata": {
+            "track": "v31_baseline",
+            "version": "3.1",
+            "status": "VERIFIED",
+            "source": "NEPS Master CRF V3.1",
+            "field_count": 223,
+            "respondent_questions": 188,
+            "core_73_items": 73,
+            "participant_count": len(store.v31_baseline_records),
+            "scoring_version": store.v31_baseline_records[0].get("_scoring_version") if store.v31_baseline_records else None,
+            "note": "This is baseline screening only. Longitudinal follow-up forms are not included in V3.1."
+        }
+    }
+
+@app.get("/api/v31/participants")
+def get_v31_participants():
+    """Get V3.1 participant list (registry fields only)."""
+    participants = []
+    for record in store.v31_baseline_records:
+        participants.append({
+            "study_id": record["study_id"],
+            "country": record["country"],
+            "site_id": record["site_id"],
+            "site_setting": record["site_setting"],
+            "age_years": record["age_years"],
+            "sex_report": record["sex_report"],
+            "screen_date": record["screen_date"],
+        })
+    return {
+        "data": participants,
+        "metadata": {
+            "track": "v31_baseline",
+            "version": "3.1",
+            "count": len(participants)
+        }
     }

@@ -152,24 +152,81 @@ All endpoints are live on Render and can be tested directly in the browser:
 | `/api/participants/{id}/nlp-responses` | GET | [Example: NEPS-GHA-0001](https://mock-redcap-service.onrender.com/api/participants/NEPS-GHA-0001/nlp-responses) | Get NLP responses for a specific participant |
 | `/api/stats` | GET | [Link](https://mock-redcap-service.onrender.com/api/stats) | Project-wide statistics (aggregate metrics) |
 | `/api/export/records` | GET | [Link](https://mock-redcap-service.onrender.com/api/export/records) | Export all records in REDCap-compatible JSON format |
+|| `/api/v31/baseline` | GET | [Link](https://mock-redcap-service.onrender.com/api/v31/baseline) | **V3.1 baseline screening** (Track A - VERIFIED) - Full 223-field baseline per NEPS Master CRF V3.1 |
+|| `/api/v31/participants` | GET | [Link](https://mock-redcap-service.onrender.com/api/v31/participants) | **V3.1 participant list** (registry fields only) |
 | `/api/field-mapping` | GET | [Link](https://mock-redcap-service.onrender.com/api/field-mapping) | Current CRF-to-internal field mapping |
 
 ---
 
-## Team Configuration
+## Version 4.0 - V3.1 Baseline Screening (Track A)
 
-Set this in your `.env`:
+### Overview
+The mock service now includes a **V3.1-faithful baseline screening endpoint** that aligns with the NEPS Master CRF V3.1 from the NDS_Team handover. This is a **separate track** from the longitudinal monthly reports.
 
-```bash
-REDCAP_API_URL=https://mock-redcap-service.onrender.com/api
-REDCAP_API_TOKEN=mock_token_neps_2025
-```
+### Track A: V3.1-Faithful Baseline (VERIFIED)
 
-When real REDCap is ready, change only the URL and token.
+**Endpoint:** `/api/v31/baseline`
 
-## Deploy to Render (If you need to re-deploy)
+**Specifications:**
+- **Source:** NEPS Master CRF V3.1 (NDS_Team handover, October 12, 2026)
+- **Total fields:** 223 fields (188 respondent questions + 35 administrative)
+- **Core 73 items:** All verified clinical items (EPI, ESI, SBI, K6, BRS, MSPSS, GSE)
+- **Forms included:**
+  - `neps31_registry` - Administrative ID and demographics
+  - `neps31_screening` - Core 73 clinical items
+  - `neps31_cohort_interest` - Longitudinal willingness (5 fields)
+  - `neps31_extended_baseline` - Extended demographics, assets, context (74 fields)
+  - `neps31_yeb` - Emotional/behavioral functioning (19 fields)
+  - `neps31_ycad` - Childhood adversity (17 fields)
+- **Participant count:** 150 participants
+- **ID format:** `MOCK-0001` to `MOCK-0150` (no country encoding per V3.1 contract)
+- **Scoring:** Official V3.1 arithmetic via ported `v31.py` from handover
+- **Missingness:** 3-8% realistic missingness patterns applied
+- **Branching logic:** Respected (hidden fields are BLANK, not 96)
 
-1. Push this repo to GitHub
-2. Connect repo to Render (New Web Service → Build and deploy from Git repository)
-3. Render reads `render.yaml` and deploys automatically
+**Derived scores calculated:**
+- `nses_composite_score` - NSES composite (0-100)
+- `epi_score` - Educational Pressure Index (0-100)
+- `esi_score` - Economic Stress Index (0-100)
+- `sbi_score` - Stigma Burden Index (0-100)
+- `k6_total` - K6 total (0-24)
+- `brs_score` - Brief Resilience Scale (0-100)
+- `mspss_score` - Perceived Social Support (0-100)
+- `gse_score` - General Self-Efficacy (0-100)
+- `pfi_score` - Protective Factors Index (0-100)
+
+**Fields kept NULL per contract:**
+- `iwi_score`, `stressor_burden_count`, `stressor_burden_class`, `stressor_profile`
+- These require verified coefficients not yet provided
+
+### Track B: Provisional Longitudinal Layer (UNVERIFIED)
+
+**⚠️ WARNING:** The following components have **no corresponding real CRF** in the V3.1 handover:
+
+- Monthly reports (14 scores × 24 months)
+- Comprehensive waves (600 records)
+- WP6 session logs
+- Suicidality screening
+- NLP responses (2000 records)
+
+**Safeguarding notice:** The suicidality screening in Track B is **UNVERIFIED**. Safeguarding alerts require immediate escalation to Dr. Linda. This is currently the only safeguarding trigger available.
+
+**Status:** When real monthly follow-up CRF forms arrive from the REDCap team, the field mapping will be updated to use the real definitions.
+
+### Field Mapping Configuration
+
+See `/api/field-mapping` endpoint or `field_mapping.json` for complete field mapping between Track A (V3.1 baseline) and Track B (provisional longitudinal).
+
+### Participant Linkage
+
+- **Track A IDs:** `MOCK-0001` to `MOCK-0150` (new format, no encoding)
+- **Track B IDs:** `NEPS-GHA/SIE/TAN-XXXX` (legacy format, preserved for backward compatibility)
+- **Policy:** Same participant pool across both tracks for linkage
+
+### CI Testing
+
+SCORING_GOLDEN CI tests run on every commit to ensure V3.1 scoring arithmetic remains correct:
+- Test file: `tests/test_scoring_golden.py`
+- Golden fixtures: `scoring_golden.json` (from NDS_Team handover)
+- Tests: 7 tests covering composite calculation, field counts, valid ranges, missingness, and BRS reverse scoring
 
