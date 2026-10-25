@@ -1144,3 +1144,119 @@ def get_v31_participants():
             "count": len(participants)
         }
     }
+
+@app.post("/api/v31/baseline", status_code=201)
+def submit_v31_baseline(payload: Dict[str, Any]):
+    """
+    Submit a V3.1 baseline screening record.
+    
+    Accepts respondent screening questionnaire data, auto-scores core items,
+    stores the record in the in-memory store, and returns the scored record.
+    """
+    data = payload.get("data", payload) if isinstance(payload, dict) else payload
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid payload: expected JSON object")
+    
+    record = dict(data)
+    
+    # Generate study_id if not provided
+    if not record.get("study_id"):
+        next_id = len(store.v31_baseline_records) + 1
+        record["study_id"] = f"MOCK-{next_id:04d}"
+        
+    if not record.get("screen_date"):
+        record["screen_date"] = datetime.now().strftime("%Y-%m-%d")
+        
+    if not record.get("crf_version"):
+        record["crf_version"] = "3.1"
+        
+    record["_instrument"] = "neps31_screening"
+    record["_form_name"] = "neps31_screening"
+    record["_source"] = "v31_baseline_submission"
+    record["_version"] = "3.1"
+    
+    # Auto-score the submitted record
+    scored_list = store.v31_generator.score_records([record])
+    scored_record = scored_list[0]
+    
+    # Append to in-memory baseline store
+    store.v31_baseline_records.append(scored_record)
+    
+    return {
+        "status": "success",
+        "message": "V3.1 Baseline screening record recorded and scored successfully",
+        "study_id": scored_record["study_id"],
+        "data": scored_record,
+        "scores": {
+            "nses_100": scored_record.get("nses_100"),
+            "epi_100": scored_record.get("epi_100"),
+            "esi_100": scored_record.get("esi_100"),
+            "sbi_100": scored_record.get("sbi_100"),
+            "pfi_100": scored_record.get("pfi_100"),
+            "mhdi_100": scored_record.get("mhdi_100"),
+            "k6_raw": scored_record.get("k6_raw"),
+            "screen_score_status": scored_record.get("screen_score_status"),
+        }
+    }
+
+@app.get("/api/v31/dictionary")
+def get_v31_dictionary():
+    """
+    Get the official 18-column REDCap Data Dictionary metadata for Master CRF V3.1.
+    Provides field labels, choices, validation, and branching logic for frontend UI forms.
+    """
+    import csv
+    dict_path = os.path.join(os.path.dirname(__file__), "NEPS_Master_CRF_V3_1_REDCap_18_Column_Data_Dictionary.csv")
+    if not os.path.exists(dict_path):
+        dict_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "NDS_Team", "reference_sources",
+            "NEPS Master CRF V3.1- REDCap Data Dictionary",
+            "NEPS_Master_CRF_V3_1_REDCap_18_Column_Data_Dictionary.csv"
+        ))
+    
+    if not os.path.exists(dict_path):
+        raise HTTPException(status_code=404, detail="V3.1 REDCap Data Dictionary file not found")
+        
+    fields = []
+    forms = {}
+    with open(dict_path, mode="r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            field_name = row.get("Variable / Field Name", "").strip()
+            form_name = row.get("Form Name", "").strip()
+            if not field_name:
+                continue
+            entry = {
+                "field_name": field_name,
+                "form_name": form_name,
+                "section_header": row.get("Section Header", "").strip(),
+                "field_type": row.get("Field Type", "").strip(),
+                "field_label": row.get("Field Label", "").strip(),
+                "choices": row.get("Choices, Calculations, OR Slider Labels", "").strip(),
+                "field_note": row.get("Field Note", "").strip(),
+                "validation_type": row.get("Text Validation Type OR Show Slider Number", "").strip(),
+                "validation_min": row.get("Text Validation Min", "").strip(),
+                "validation_max": row.get("Text Validation Max", "").strip(),
+                "required": row.get("Required Field?", "").strip().lower() == "y",
+                "branching_logic": row.get("Branching Logic (Show field only if...)", "").strip(),
+            }
+            fields.append(entry)
+            forms.setdefault(form_name, []).append(field_name)
+            
+    return {
+        "data": fields,
+        "metadata": {
+            "version": "3.1",
+            "total_fields": len(fields),
+            "forms": {k: len(v) for k, v in forms.items()},
+            "entry_forms": [
+                "neps31_registry",
+                "neps31_screening",
+                "neps31_cohort_interest",
+                "neps31_extended_baseline",
+                "neps31_yeb",
+                "neps31_ycad"
+            ]
+        }
+    }
+
