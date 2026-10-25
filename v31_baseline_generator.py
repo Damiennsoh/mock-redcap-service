@@ -19,7 +19,7 @@ FORM_FIELD_GROUPS = {
     ],
     'neps31_screening': CORE_73_FIELDS,  # 73 core clinical items
     'neps31_cohort_interest': [
-        'willing_24m', 'contact_21m', 'wp3_willing', 'wp4_willing', 'wp6_willing',
+        'willing_24m', 'contact_24m', 'wp3_willing', 'wp4_willing', 'wp6_willing',
     ],
     'neps31_extended_baseline': [
         'currently_school', 'ever_school', 'school_level', 'not_school_reason',
@@ -131,7 +131,7 @@ class V31BaselineGenerator:
         
         # neps31_cohort_interest (5 fields)
         record['willing_24m'] = random.choice(['0', '1'])
-        record['contact_21m'] = random.choice(['0', '1'])
+        record['contact_24m'] = random.choice(['0', '1'])
         record['wp3_willing'] = random.choice(['0', '1'])
         record['wp4_willing'] = random.choice(['0', '1'])
         record['wp6_willing'] = random.choice(['0', '1'])
@@ -373,16 +373,41 @@ class V31BaselineGenerator:
             # Score
             result = self.scorer.score(core_responses)
             
-            # Add derived scores to record
-            record['nses_composite_score'] = float(result.scores['NSES'].value) if result.scores['NSES'].value is not None else None
-            record['epi_score'] = float(result.scores['EPI'].value) if result.scores['EPI'].value is not None else None
-            record['esi_score'] = float(result.scores['ESI'].value) if result.scores['ESI'].value is not None else None
-            record['sbi_score'] = float(result.scores['SBI'].value) if result.scores['SBI'].value is not None else None
-            record['k6_total'] = float(result.scores['K6_total'].value) if result.scores['K6_total'].value is not None else None
-            record['brs_score'] = float(result.scores['BRS_100'].value) if result.scores['BRS_100'].value is not None else None
-            record['mspss_score'] = float(result.scores['MSPSS_100'].value) if result.scores['MSPSS_100'].value is not None else None
-            record['gse_score'] = float(result.scores['GSE_100'].value) if result.scores['GSE_100'].value is not None else None
-            record['pfi_score'] = float(result.scores['PFI'].value) if result.scores['PFI'].value is not None else None
+            # Add derived scores to record (both official CRF dictionary names and convenience aliases)
+            nses_val = float(result.scores['NSES'].value) if result.scores['NSES'].value is not None else None
+            epi_val = float(result.scores['EPI'].value) if result.scores['EPI'].value is not None else None
+            esi_val = float(result.scores['ESI'].value) if result.scores['ESI'].value is not None else None
+            sbi_val = float(result.scores['SBI'].value) if result.scores['SBI'].value is not None else None
+            mhdi_val = float(result.scores['MHDI'].value) if result.scores.get('MHDI') and result.scores['MHDI'].value is not None else None
+            pfi_val = float(result.scores['PFI'].value) if result.scores['PFI'].value is not None else None
+            k6_val = float(result.scores['K6_total'].value) if result.scores['K6_total'].value is not None else None
+            brs_val = float(result.scores['BRS_100'].value) if result.scores['BRS_100'].value is not None else None
+            mspss_val = float(result.scores['MSPSS_100'].value) if result.scores['MSPSS_100'].value is not None else None
+            gse_val = float(result.scores['GSE_100'].value) if result.scores['GSE_100'].value is not None else None
+            
+            # Official dictionary fields (neps31_derived)
+            record['nses_100'] = nses_val
+            record['epi_100'] = epi_val
+            record['esi_100'] = esi_val
+            record['sbi_100'] = sbi_val
+            record['mhdi_100'] = mhdi_val
+            record['pfi_100'] = pfi_val
+            record['k6_raw'] = k6_val
+            record['brs_raw'] = brs_val
+            record['mspss_raw'] = mspss_val
+            record['gse_raw'] = gse_val
+            record['screen_score_status'] = 'complete' if nses_val is not None else 'incomplete'
+            
+            # Convenience aliases
+            record['nses_composite_score'] = nses_val
+            record['epi_score'] = epi_val
+            record['esi_score'] = esi_val
+            record['sbi_score'] = sbi_val
+            record['k6_total'] = k6_val
+            record['brs_score'] = brs_val
+            record['mspss_score'] = mspss_val
+            record['gse_score'] = gse_val
+            record['pfi_score'] = pfi_val
             
             record['_scoring_version'] = result.algorithm_version
             record['_scored_at'] = datetime.now().isoformat()
