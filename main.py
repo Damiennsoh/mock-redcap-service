@@ -1200,13 +1200,23 @@ def submit_v31_baseline(payload: Dict[str, Any]):
     }
 
 @app.get("/api/v31/dictionary")
-def get_v31_dictionary():
+@app.get("/api/v32/dictionary")
+def get_v31_dictionary(version: str = "3.2"):
     """
-    Get the official 18-column REDCap Data Dictionary metadata for Master CRF V3.1.
+    Get the official 18-column REDCap Data Dictionary metadata for Master CRF V3.2 (or V3.1).
     Provides field labels, choices, validation, and branching logic for frontend UI forms.
     """
     import csv
-    dict_path = os.path.join(os.path.dirname(__file__), "NEPS_Master_CRF_V3_1_REDCap_18_Column_Data_Dictionary.csv")
+    if version == "3.1":
+        dict_filename = "NEPS_Master_CRF_V3_1_REDCap_18_Column_Data_Dictionary.csv"
+    else:
+        dict_filename = "NEPSPROJECT_DataDictionary_Version 3.2_Dated26OCT2026.csv"
+        
+    dict_path = os.path.join(os.path.dirname(__file__), dict_filename)
+    if not os.path.exists(dict_path):
+        dict_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "NDS_Team", dict_filename
+        ))
     if not os.path.exists(dict_path):
         dict_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "..", "NDS_Team", "reference_sources",
@@ -1215,7 +1225,7 @@ def get_v31_dictionary():
         ))
     
     if not os.path.exists(dict_path):
-        raise HTTPException(status_code=404, detail="V3.1 REDCap Data Dictionary file not found")
+        raise HTTPException(status_code=404, detail="REDCap Data Dictionary file not found")
         
     fields = []
     forms = {}
@@ -1243,10 +1253,11 @@ def get_v31_dictionary():
             fields.append(entry)
             forms.setdefault(form_name, []).append(field_name)
             
+    ver_str = "3.2" if "3.2" in dict_filename or len(fields) >= 227 else "3.1"
     return {
         "data": fields,
         "metadata": {
-            "version": "3.1",
+            "version": ver_str,
             "total_fields": len(fields),
             "forms": {k: len(v) for k, v in forms.items()},
             "entry_forms": [
@@ -1256,7 +1267,8 @@ def get_v31_dictionary():
                 "neps31_extended_baseline",
                 "neps31_yeb",
                 "neps31_ycad"
-            ]
+            ],
+            "source": os.path.basename(dict_path)
         }
     }
 
