@@ -1168,7 +1168,11 @@ def submit_v31_baseline(payload: Dict[str, Any]):
         record["screen_date"] = datetime.now().strftime("%Y-%m-%d")
         
     if not record.get("crf_version"):
-        record["crf_version"] = "3.1"
+        record["crf_version"] = "3.2"
+    if "survey_consent" not in record:
+        record["survey_consent"] = "1"
+    if not record.get("tdate") and record.get("screen_date"):
+        record["tdate"] = record.get("screen_date")
         
     record["_instrument"] = "neps31_screening"
     record["_form_name"] = "neps31_screening"
@@ -1260,14 +1264,14 @@ def get_v31_dictionary(version: str = "3.2"):
             "version": ver_str,
             "total_fields": len(fields),
             "forms": {k: len(v) for k, v in forms.items()},
-            "entry_forms": [
+            "entry_forms": [f for f in [
                 "neps31_registry",
                 "neps31_screening",
                 "neps31_cohort_interest",
                 "neps31_extended_baseline",
                 "neps31_yeb",
                 "neps31_ycad"
-            ],
+            ] if f in forms] or list(forms.keys()),
             "source": os.path.basename(dict_path)
         }
     }
