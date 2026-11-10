@@ -17,7 +17,7 @@ FORM_FIELD_GROUPS = {
         'screen_date', 'crf_version', 'form_lang', 'age_years', 'sex_report',
         'study_resident', 'screen_form_complete',
     ],
-    'neps31_screening': CORE_73_FIELDS,  # 73 core clinical items
+    'neps31_screening': ['survey_consent', 'tdate', 'dob', 'lblage'] + CORE_73_FIELDS,  # V3.2 screening items
     'neps31_cohort_interest': [
         'willing_24m', 'contact_24m', 'wp3_willing', 'wp4_willing', 'wp6_willing',
     ],
@@ -122,9 +122,19 @@ class V31BaselineGenerator:
         record['site_setting'] = random.choice(['Urban', 'Peri-urban', 'Rural'])
         record['recruit_src'] = random.choice(['School', 'Technical or vocational', 'Tertiary institution', 'Community'])
         record['screen_date'] = (datetime.now() - timedelta(days=random.randint(0, 180))).strftime("%Y-%m-%d")
-        record['crf_version'] = '3.1'
+        record['crf_version'] = '3.2'
         record['form_lang'] = random.choice(['English', 'Akan/Twi', 'Krio', 'Kiswahili', 'Other approved language'])
-        record['age_years'] = random.randint(12, 24)
+        age_years = random.randint(12, 24)
+        record['age_years'] = age_years
+        # V3.2 consent and automated DOB fields
+        record['survey_consent'] = '1'
+        screen_dt = datetime.strptime(record['screen_date'], "%Y-%m-%d")
+        birth_year = screen_dt.year - age_years
+        birth_month = random.randint(1, 12)
+        birth_day = random.randint(1, 28)
+        record['dob'] = f"{birth_day:02d}-{birth_month:02d}-{birth_year}"
+        record['tdate'] = record['screen_date']
+        record['lblage'] = ''
         record['sex_report'] = random.choice(['1', '2', '99'])  # Boy/male, Girl/female, Prefer not
         record['study_resident'] = random.choice(['0', '1', '98', '99'])
         record['screen_form_complete'] = '2'  # Complete and reviewed
