@@ -3,6 +3,8 @@ services:
     name: neps-mock-api
     runtime: docker
     plan: free
+    branch: main
+    autoDeploy: true
     envVars:
       - key: MOCK_API_TOKEN
         generateValue: true
